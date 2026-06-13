@@ -1,0 +1,123 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Surfaces */
+    --background: 150 30% 98%;
+    --foreground: 200 20% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 200 20% 12%;
+
+    /* Brand */
+    --primary: 158 64% 38%;
+    --primary-foreground: 0 0% 100%;
+    --primary-dark: 162 70% 26%;
+
+    --secondary: 150 24% 95%;
+    --secondary-foreground: 200 20% 14%;
+    --muted: 150 18% 95%;
+    --muted-foreground: 200 10% 42%;
+    --accent: 158 44% 94%;
+    --accent-foreground: 162 60% 24%;
+
+    --destructive: 0 72% 52%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Semantic status */
+    --success: 158 64% 38%;
+    --success-foreground: 0 0% 100%;
+    --warning: 36 95% 46%;
+    --warning-foreground: 30 80% 12%;
+    --danger: 0 70% 50%;
+    --danger-foreground: 0 0% 100%;
+
+    --border: 150 16% 90%;
+    --input: 150 16% 88%;
+    --ring: 158 64% 38%;
+    --radius: 1rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+@layer components {
+  .page-container {
+    @apply mx-auto max-w-6xl px-4 sm:px-6;
+  }
+
+  .soft-card {
+    @apply rounded-2xl border border-border/70 bg-card shadow-card;
+  }
+
+  .stat-pill {
+    @apply rounded-2xl px-4 py-3;
+  }
+
+  /* Brand gradient for hero / accents */
+  .brand-gradient {
+    background-image: radial-gradient(
+        120% 120% at 0% 0%,
+        hsl(158 64% 94%) 0%,
+        transparent 55%
+      ),
+      radial-gradient(120% 120% at 100% 0%, hsl(180 50% 93%) 0%, transparent 50%);
+  }
+
+  .text-gradient {
+    background-image: linear-gradient(
+      to bottom right,
+      hsl(var(--primary)),
+      hsl(var(--primary-dark))
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Semantic status surfaces — replace hardcoded emerald/amber/red */
+  .surface-success {
+    border-color: hsl(var(--success) / 0.3);
+    background-color: hsl(var(--success) / 0.08);
+    color: hsl(162 60% 24%);
+  }
+  .surface-warning {
+    border-color: hsl(var(--warning) / 0.35);
+    background-color: hsl(var(--warning) / 0.1);
+    color: hsl(30 80% 24%);
+  }
+  .surface-danger {
+    border-color: hsl(var(--danger) / 0.3);
+    background-color: hsl(var(--danger) / 0.08);
+    color: hsl(0 60% 38%);
+  }
+
+  /* Paywall: blurred locked content */
+  .lock-blur {
+    pointer-events: none;
+    user-select: none;
+    filter: blur(6px) saturate(0.5);
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+}
