@@ -49,6 +49,7 @@ import { MonthlyTradeoff } from "@/components/calculator/monthly-tradeoff";
 import { DonutChart } from "@/components/calculator/charts";
 import { LockedFeature } from "@/components/calculator/locked-feature";
 import { MonthLedger } from "@/components/account/month-ledger";
+import { TelegramCta } from "@/components/telegram/telegram-cta";
 import { cn, formatRub } from "@/lib/utils";
 
 const lock = (key: keyof typeof FREEMIUM.lock) =>
@@ -156,6 +157,9 @@ export function CalculatorApp({ paid = false }: { paid?: boolean }) {
 
       {/* 2. Главный ответ — бесплатно для всех */}
       <PrimaryAnswer budget={budget} result={fullResult} />
+
+      {/* Воронка в Telegram — после расчёта уводим продолжать в боте */}
+      <TelegramCta />
 
       {paid ? (
         <>

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MoneyWaterfall, type WaterfallStep } from "@/components/calculator/charts";
+import { TelegramLinkButton } from "@/components/account/telegram-link-button";
 import { computeFinance } from "@/lib/finance";
 import { cn, formatRub } from "@/lib/utils";
 
@@ -141,6 +142,13 @@ export function HomeDemo() {
               <ArrowRight className="ml-1 h-4 w-4 shrink-0" />
             </Link>
           </Button>
+          <div className="mt-2">
+            <TelegramLinkButton
+              label="Получать в Telegram каждый день"
+              variant="outline"
+              className="w-full justify-center rounded-xl"
+            />
+          </div>
           <p className="mt-2 text-center text-xs text-muted-foreground">
             Накопления, покупки и распределение — бесплатно, без регистрации
           </p>
