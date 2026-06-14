@@ -27,11 +27,17 @@ async function callTelegram(method: string, payload: unknown): Promise<void> {
   const agent = proxyAgent();
 
   if (!agent) {
-    await fetch(api(method), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body,
-    }).catch(() => {});
+    try {
+      const r = await fetch(api(method), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body,
+      });
+      const txt = await r.text();
+      console.log(`tg ${method} (direct) → ${r.status} ${txt.slice(0, 300)}`);
+    } catch (e) {
+      console.error(`tg ${method} (direct) ошибка →`, (e as Error).message);
+    }
     return;
   }
 
@@ -48,12 +54,20 @@ async function callTelegram(method: string, payload: unknown): Promise<void> {
         timeout: 15000,
       },
       (res) => {
-        res.on("data", () => {});
-        res.on("end", () => resolve());
+        let data = "";
+        res.on("data", (c) => (data += c));
+        res.on("end", () => {
+          console.log(`tg ${method} (proxy) → ${res.statusCode} ${data.slice(0, 300)}`);
+          resolve();
+        });
       },
     );
-    req.on("error", () => resolve());
+    req.on("error", (e) => {
+      console.error(`tg ${method} (proxy) ошибка →`, e.message);
+      resolve();
+    });
     req.on("timeout", () => {
+      console.error(`tg ${method} (proxy) → timeout`);
       req.destroy();
       resolve();
     });
