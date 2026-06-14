@@ -99,75 +99,79 @@ async function patchUser(tgId: number, patch: Partial<TgUser>) {
     .eq("tg_id", tgId);
 }
 
-// ── Расчёты ────────────────────────────────────────────────────────────
+// ── Расчёты и леджер ───────────────────────────────────────────────────
+export type LedgerKind = "expense" | "income";
+
 /** Свободно на месяц = доход − обязательные − откладываю (тот же якорь, что на сайте). */
-function freeOf(u: TgUser): number {
+function freeFromBudget(income: number, mandatory: number, savings: number): number {
   return computeFinance({
-    incomeMonthly: u.income,
-    mandatoryMonthly: u.mandatory,
-    savingsMonthly: u.savings,
+    incomeMonthly: income,
+    mandatoryMonthly: mandatory,
+    savingsMonthly: savings,
     currentBalance: 0,
     minimumBalance: 0,
     plannedVariableMonthly: 0,
   }).core.freeBudgetMonthly;
 }
-
-async function monthSpent(tgId: number): Promise<number> {
-  const supabase = createAdminClient();
-  const { data } = await supabase
-    .from("tg_expenses")
-    .select("amount")
-    .eq("tg_id", tgId)
-    .gte("day", mskMonthStart());
-  return (data ?? []).reduce((s, r) => s + ((r as { amount: number }).amount || 0), 0);
+function freeOf(u: TgUser): number {
+  return freeFromBudget(u.income, u.mandatory, u.savings);
 }
 
-async function spentOn(tgId: number, day: string): Promise<number> {
-  const supabase = createAdminClient();
-  const { data } = await supabase
-    .from("tg_expenses")
-    .select("amount")
-    .eq("tg_id", tgId)
-    .eq("day", day);
-  return (data ?? []).reduce((s, r) => s + ((r as { amount: number }).amount || 0), 0);
+/** Ключ агрегации леджера: по аккаунту (если привязан), иначе по чату Telegram. */
+type LedgerKey = { userId?: string | null; tgId?: number | null };
+function keyOf(u: TgUser): LedgerKey {
+  return u.user_id ? { userId: u.user_id } : { tgId: u.tg_id };
 }
 
-async function todayExpenses(tgId: number): Promise<{ amount: number; note: string | null }[]> {
+/** Σ трат и Σ разовых доходов за текущий месяц. */
+async function ledgerTotals(key: LedgerKey): Promise<{ expense: number; income: number }> {
   const supabase = createAdminClient();
-  const { data } = await supabase
-    .from("tg_expenses")
-    .select("amount,note")
-    .eq("tg_id", tgId)
-    .eq("day", mskToday())
-    .order("id", { ascending: true });
-  return (data ?? []) as { amount: number; note: string | null }[];
+  const base = supabase.from("tg_expenses").select("amount,kind").gte("day", mskMonthStart());
+  const { data } = await (key.userId ? base.eq("user_id", key.userId) : base.eq("tg_id", key.tgId as number));
+  let expense = 0;
+  let income = 0;
+  for (const r of (data ?? []) as { amount: number; kind: string }[]) {
+    if (r.kind === "income") income += r.amount || 0;
+    else expense += r.amount || 0;
+  }
+  return { expense, income };
 }
 
-async function logExpense(u: TgUser, amount: number, note: string | null) {
+/** Σ трат за конкретный день (для «сегодня/вчера» в сообщениях). */
+async function dayExpense(key: LedgerKey, day: string): Promise<number> {
+  const supabase = createAdminClient();
+  const base = supabase.from("tg_expenses").select("amount,kind").eq("day", day);
+  const { data } = await (key.userId ? base.eq("user_id", key.userId) : base.eq("tg_id", key.tgId as number));
+  return (data ?? [])
+    .filter((r) => (r as { kind: string }).kind !== "income")
+    .reduce((s, r) => s + ((r as { amount: number }).amount || 0), 0);
+}
+
+async function logEntry(u: TgUser, amount: number, note: string | null, kind: LedgerKind, source = "tg") {
   const supabase = createAdminClient();
   await supabase.from("tg_expenses").insert({
     tg_id: u.tg_id,
     user_id: u.user_id,
-    amount: Math.round(amount),
+    amount: Math.round(Math.abs(amount)),
     note: note || null,
+    kind,
+    source,
     day: mskToday(),
   });
 }
 
-async function undoLastToday(tgId: number): Promise<number | null> {
+async function undoLastToday(u: TgUser): Promise<{ amount: number; kind: string } | null> {
   const supabase = createAdminClient();
-  const { data } = await supabase
-    .from("tg_expenses")
-    .select("id,amount")
-    .eq("tg_id", tgId)
-    .eq("day", mskToday())
+  const key = keyOf(u);
+  const base = supabase.from("tg_expenses").select("id,amount,kind").eq("day", mskToday());
+  const { data } = await (key.userId ? base.eq("user_id", key.userId) : base.eq("tg_id", key.tgId as number))
     .order("id", { ascending: false })
     .limit(1)
     .maybeSingle();
   if (!data) return null;
-  const row = data as { id: number; amount: number };
+  const row = data as { id: number; amount: number; kind: string };
   await supabase.from("tg_expenses").delete().eq("id", row.id);
-  return row.amount;
+  return { amount: row.amount, kind: row.kind };
 }
 
 // ── Тексты ─────────────────────────────────────────────────────────────
@@ -192,11 +196,11 @@ function goalLine(u: TgUser): string | null {
 
 async function statusText(u: TgUser): Promise<string> {
   const free = freeOf(u);
-  const spent = await monthSpent(u.tg_id);
-  const remaining = free - spent;
+  const { expense, income } = await ledgerTotals(keyOf(u));
+  const remaining = free - expense + income;
   const daysLeft = mskDaysLeftInMonth();
   const perDay = remaining > 0 ? Math.round(remaining / daysLeft) : 0;
-  const today = await spentOn(u.tg_id, mskToday());
+  const today = await dayExpense(keyOf(u), mskToday());
 
   let head: string;
   if (remaining < 0) {
@@ -212,9 +216,12 @@ async function statusText(u: TgUser): Promise<string> {
     head,
     ``,
     `Свободно на месяц: ${fmt(free)}`,
-    `Потрачено: ${fmt(spent)} (сегодня ${fmt(today)})`,
-    `Осталось: <b>${fmt(Math.max(0, remaining))}</b> ≈ ${fmt(perDay)}/день · ${daysLeft} ${pluralDays(daysLeft)}`,
+    `Потрачено: ${fmt(expense)} (сегодня ${fmt(today)})`,
   ];
+  if (income > 0) lines.push(`Разовый доход: +${fmt(income)}`);
+  lines.push(
+    `Осталось: <b>${fmt(Math.max(0, remaining))}</b> ≈ ${fmt(perDay)}/день · ${daysLeft} ${pluralDays(daysLeft)}`,
+  );
   const g = goalLine(u);
   if (g) lines.push(``, g);
   return lines.join("\n");
@@ -376,10 +383,11 @@ export async function handleMessage(chatId: number, rawText: string) {
       chatId,
       `ℹ️ <b>Как пользоваться</b>\n\n` +
         `• Пиши траты — <i>500</i> или <i>кофе 300</i>. Я веду месяц.\n` +
+        `• Прилетели деньги? Пиши <i>+5000 премия</i> — разовый доход.\n` +
         `• 📊 Остаток — сколько ещё можно тратить и в день\n` +
         `• 🎯 Цель — сколько осталось копить\n` +
         `• 🛒 Можно купить? — проверю крупную покупку\n` +
-        `• /undo — удалить последнюю трату\n` +
+        `• /undo — удалить последнюю запись\n` +
         `• /setup — настроить бюджет вручную\n` +
         `• 🔄 Обновить с сайта — подтянуть свежий бюджет и цель\n\n` +
         `Полная версия (категории, история, графики): ${SITE}?utm_source=tg`,
@@ -458,12 +466,13 @@ export async function handleMessage(chatId: number, rawText: string) {
   }
 
   if (lower === "/undo") {
-    const removed = await undoLastToday(chatId);
+    const removed = await undoLastToday(u);
     if (removed == null) {
-      await tgSend(chatId, `Сегодня трат ещё нет.`, { keyboard: KB.keyboard });
+      await tgSend(chatId, `Сегодня записей ещё нет.`, { keyboard: KB.keyboard });
       return;
     }
-    await tgSend(chatId, `↩️ Удалил последнюю трату ${fmt(removed)}.\n\n${await statusText(await getUser(chatId))}`, {
+    const what = removed.kind === "income" ? "разовый доход" : "трату";
+    await tgSend(chatId, `↩️ Удалил последнюю ${what} ${fmt(removed.amount)}.\n\n${await statusText(await getUser(chatId))}`, {
       keyboard: KB.keyboard,
     });
     return;
@@ -519,13 +528,27 @@ export async function handleMessage(chatId: number, rawText: string) {
       await tgSend(chatId, `Сколько потратил? Пришли сумму, например <i>500</i> или <i>кофе 300</i>.`);
       return;
     }
-    await recordSpend(chatId, rest);
+    await recordEntry(chatId, rest, "expense");
     return;
   }
 
   if (u.step === "spend") {
     await patchUser(chatId, { step: null });
-    await recordSpend(chatId, t);
+    await recordEntry(chatId, t, "expense");
+    return;
+  }
+
+  // ── «+5000 премия» = разовый доход (прилетели деньги) ──
+  if (t.startsWith("+")) {
+    if (u.income <= 0) {
+      await tgSend(
+        chatId,
+        `Сначала настрой бюджет — /setup или привяжи аккаунт (${SITE}/account).`,
+        { keyboard: KB.keyboard },
+      );
+      return;
+    }
+    await recordEntry(chatId, t.slice(1).trim(), "income");
     return;
   }
 
@@ -540,7 +563,7 @@ export async function handleMessage(chatId: number, rawText: string) {
       );
       return;
     }
-    await recordSpend(chatId, t);
+    await recordEntry(chatId, t, "expense");
     return;
   }
 
@@ -551,8 +574,8 @@ export async function handleMessage(chatId: number, rawText: string) {
   );
 }
 
-/** Записать трату из строки «кофе 300» / «300» и показать остаток. */
-async function recordSpend(chatId: number, text: string) {
+/** Записать запись леджера (трату или разовый доход) и показать остаток. */
+async function recordEntry(chatId: number, text: string, kind: LedgerKind) {
   const u = await getUser(chatId);
   const parsed = parsePurchase(text);
   if (!parsed) {
@@ -560,66 +583,191 @@ async function recordSpend(chatId: number, text: string) {
     return;
   }
   const note = parsed.label && parsed.label !== "покупка" ? parsed.label : null;
-  await logExpense(u, parsed.amount, note);
+  await logEntry(u, parsed.amount, note, kind);
 
   const free = freeOf(u);
-  const spent = await monthSpent(chatId);
-  const remaining = free - spent;
+  const { expense, income } = await ledgerTotals(keyOf(u));
+  const remaining = free - expense + income;
   const daysLeft = mskDaysLeftInMonth();
   const perDay = remaining > 0 ? Math.round(remaining / daysLeft) : 0;
-  const today = await spentOn(chatId, mskToday());
 
   const noteLabel = note ? ` (${note})` : "";
   const tail =
     remaining < 0
       ? `🔴 Перерасход ${fmt(-remaining)}. До конца месяца лучше не тратить.`
       : `Осталось на месяц: <b>${fmt(remaining)}</b> ≈ ${fmt(perDay)}/день.`;
-  await tgSend(
-    chatId,
-    `✍️ Записал ${fmt(parsed.amount)}${noteLabel}. Сегодня: ${fmt(today)}.\n${tail}\n\n<i>Ошибся? /undo</i>`,
-    { keyboard: KB.keyboard },
-  );
+  const head =
+    kind === "income"
+      ? `💵 Записал разовый доход +${fmt(parsed.amount)}${noteLabel}.`
+      : `✍️ Записал трату ${fmt(parsed.amount)}${noteLabel}.`;
+  await tgSend(chatId, `${head}\n${tail}\n\n<i>Ошибся? /undo</i>`, { keyboard: KB.keyboard });
 }
 
-// ── Сводка для сайта (/account): связь Telegram ↔ сайт ─────────────────
-export type AccountTgSummary = {
+// ── Сводка и леджер для аккаунта (сайт ↔ бот) ──────────────────────────
+export type MonthSummary = {
+  /** есть бюджет (доход > 0) — можно считать остаток */
+  hasBudget: boolean;
+  /** привязан ли Telegram-бот к аккаунту */
   linked: boolean;
-  income: number;
-  free: number;
-  spentMonth: number;
-  remaining: number;
+  income: number; // месячный доход
+  free: number; // свободно на месяц (доход − обязательные − откладываю)
+  spentMonth: number; // Σ трат за месяц
+  extraIncome: number; // Σ разовых доходов за месяц
+  remaining: number; // free − spent + extraIncome
   perDay: number;
   daysLeft: number;
   goalName: string | null;
   goalRemaining: number;
 };
 
-/** Что записано через бота для данного аккаунта в этом месяце. null — бот не привязан. */
-export async function getAccountTgSummary(userId: string): Promise<AccountTgSummary | null> {
+export type LedgerEntry = {
+  id: number;
+  kind: LedgerKind;
+  amount: number;
+  note: string | null;
+  day: string;
+  source: string;
+};
+
+/** Бюджет/цель аккаунта: из telegram_users (если привязан) или из последнего расчёта. */
+async function accountBudget(userId: string): Promise<{
+  tgId: number | null;
+  income: number;
+  mandatory: number;
+  savings: number;
+  goalName: string | null;
+  goalTarget: number;
+  goalSaved: number;
+}> {
   const supabase = createAdminClient();
   const { data } = await supabase
     .from("telegram_users")
     .select("*")
     .eq("user_id", userId)
     .maybeSingle();
-  if (!data) return null;
-  const u = { ...EMPTY((data as Partial<TgUser>).tg_id as number), ...(data as Partial<TgUser>) };
+  if (data && (data as TgUser).income > 0) {
+    const u = data as TgUser;
+    return {
+      tgId: u.tg_id,
+      income: u.income,
+      mandatory: u.mandatory,
+      savings: u.savings,
+      goalName: u.goal_name,
+      goalTarget: u.goal_target,
+      goalSaved: u.goal_saved,
+    };
+  }
+  // нет привязки/бюджета в боте — берём из последнего сохранённого расчёта
+  const p = await latestPayload(userId);
+  const b = p?.budget;
+  const g = p?.savingsGoal;
+  return {
+    tgId: (data as TgUser | null)?.tg_id ?? null,
+    income: Math.round(b?.incomeMonthly ?? 0),
+    mandatory: Math.round(b?.mandatoryMonthly ?? 0),
+    savings: Math.round(b?.savingsMonthly ?? 0),
+    goalName: g?.goalName || null,
+    goalTarget: Math.round(g?.targetAmount ?? 0),
+    goalSaved: Math.round(g?.currentSaved ?? 0),
+  };
+}
 
-  const free = freeOf(u);
-  const spentMonth = await monthSpent(u.tg_id);
-  const remaining = free - spentMonth;
+/** Полная сводка месяца для аккаунта (используют /account, калькулятор, API). */
+export async function getMonthSummaryByUser(userId: string): Promise<MonthSummary> {
+  const b = await accountBudget(userId);
+  const free = freeFromBudget(b.income, b.mandatory, b.savings);
+  const { expense, income } = await ledgerTotals({ userId });
+  const remaining = free - expense + income;
   const daysLeft = mskDaysLeftInMonth();
   return {
-    linked: true,
-    income: u.income,
+    hasBudget: b.income > 0,
+    linked: b.tgId != null,
+    income: b.income,
     free,
-    spentMonth,
+    spentMonth: expense,
+    extraIncome: income,
     remaining,
     perDay: remaining > 0 ? Math.round(remaining / daysLeft) : 0,
     daysLeft,
-    goalName: u.goal_name,
-    goalRemaining: Math.max(0, u.goal_target - u.goal_saved),
+    goalName: b.goalName,
+    goalRemaining: Math.max(0, b.goalTarget - b.goalSaved),
   };
+}
+
+/** Записи леджера аккаунта за текущий месяц (новые сверху). */
+export async function getMonthEntries(userId: string): Promise<LedgerEntry[]> {
+  const supabase = createAdminClient();
+  const { data } = await supabase
+    .from("tg_expenses")
+    .select("id,kind,amount,note,day,source")
+    .eq("user_id", userId)
+    .gte("day", mskMonthStart())
+    .order("id", { ascending: false })
+    .limit(100);
+  return (data ?? []) as LedgerEntry[];
+}
+
+/** Добавить разовую корректировку с сайта; если бот привязан — шлём отчёт. */
+export async function addAdjustment(
+  userId: string,
+  kind: LedgerKind,
+  amount: number,
+  note: string | null,
+): Promise<MonthSummary> {
+  const supabase = createAdminClient();
+  const b = await accountBudget(userId);
+  const { error } = await supabase.from("tg_expenses").insert({
+    user_id: userId,
+    tg_id: b.tgId,
+    amount: Math.round(Math.abs(amount)),
+    note: note || null,
+    kind,
+    source: "web",
+    day: mskToday(),
+  });
+  if (error) throw new Error(error.message);
+  const summary = await getMonthSummaryByUser(userId);
+
+  if (b.tgId) {
+    const noteLabel = note ? ` (${note})` : "";
+    const head =
+      kind === "income"
+        ? `💵 На сайте записан разовый доход +${fmt(Math.abs(amount))}${noteLabel}.`
+        : `✍️ На сайте записана трата ${fmt(Math.abs(amount))}${noteLabel}.`;
+    const tail =
+      summary.remaining < 0
+        ? `🔴 Перерасход ${fmt(-summary.remaining)} за месяц.`
+        : `Осталось на месяц: <b>${fmt(summary.remaining)}</b> ≈ ${fmt(summary.perDay)}/день.`;
+    await tgSend(b.tgId, `${head}\n${tail}`, { keyboard: KB.keyboard });
+  }
+  return summary;
+}
+
+/** Удалить запись леджера (только свою). */
+export async function deleteEntry(userId: string, id: number): Promise<MonthSummary> {
+  const supabase = createAdminClient();
+  await supabase.from("tg_expenses").delete().eq("id", id).eq("user_id", userId);
+  return getMonthSummaryByUser(userId);
+}
+
+/** Пуш бюджета+цели в бота после сохранения расчёта на сайте + отчёт. */
+export async function pushBudgetToBot(userId: string): Promise<boolean> {
+  const supabase = createAdminClient();
+  const { data } = await supabase
+    .from("telegram_users")
+    .select("tg_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+  const tgId = (data as { tg_id: number } | null)?.tg_id;
+  if (!tgId) return false; // бот не привязан — нечего пушить
+
+  const payload = await latestPayload(userId);
+  if (!payload?.budget) return false;
+  await patchUser(tgId, patchFromPayload(payload));
+
+  const fresh = await getUser(tgId);
+  await tgSend(tgId, `🔄 Бюджет обновлён с сайта.\n\n${planText(fresh)}`, { keyboard: KB.keyboard });
+  return true;
 }
 
 // ── Напоминания (вызывается из cron) ───────────────────────────────────
@@ -649,11 +797,11 @@ export async function sendDailyReminders(force = false): Promise<{ sent: number;
   let sent = 0;
   for (const u of users) {
     const free = freeOf(u);
-    const spentM = await monthSpent(u.tg_id);
-    const remaining = free - spentM;
+    const { expense, income } = await ledgerTotals(keyOf(u));
+    const remaining = free - expense + income;
     const daysLeft = mskDaysLeftInMonth();
     const perDay = remaining > 0 ? Math.round(remaining / daysLeft) : 0;
-    const yest = await spentOn(u.tg_id, mskYesterday());
+    const yest = await dayExpense(keyOf(u), mskYesterday());
 
     const lines = [
       `☀️ <b>Доброе утро!</b>`,

@@ -9,11 +9,10 @@ import { createClient } from "@/lib/supabase/server";
 import { getProductLinks } from "@/lib/orders";
 import { hasPaidAccess } from "@/lib/access";
 import { TelegramLinkButton } from "@/components/account/telegram-link-button";
-import { getAccountTgSummary } from "@/lib/telegram-bot";
+import { MonthLedger } from "@/components/account/month-ledger";
+import { getMonthSummaryByUser } from "@/lib/telegram-bot";
 import { isSupabaseAdminConfigured } from "@/lib/supabase/admin";
 import { DEV_AUTH_COOKIE, getDevAuthConfig, isDevAuthSession } from "@/lib/dev-auth";
-
-const fmt = (n: number) => `${Math.round(n).toLocaleString("ru-RU")} ₽`;
 
 export const metadata: Metadata = {
   title: "Мой доступ — Деньги под контролем",
@@ -42,10 +41,10 @@ export default async function AccountPage() {
   const displayEmail = user?.email ?? devConfig?.email ?? "Пользователь";
   const links = getProductLinks();
 
-  // Сводка из Telegram-бота (что записано в этом месяце) — связь сайт ↔ бот
+  // Живая сводка месяца (бюджет + траты/доходы леджера) — связь сайт ↔ бот
   const tg =
     user && isSupabaseAdminConfigured()
-      ? await getAccountTgSummary(user.id).catch(() => null)
+      ? await getMonthSummaryByUser(user.id).catch(() => null)
       : null;
 
   return (
@@ -100,52 +99,18 @@ export default async function AccountPage() {
           </CardContent>
         </Card>
 
+        <MonthLedger initial={tg ?? undefined} />
+
         <Card className="soft-card mt-4">
           <CardHeader>
             <CardTitle>Telegram-бот</CardTitle>
             <CardDescription>
-              Записывайте траты в Telegram — бот ведёт месяц, а здесь видна та же картина
+              {tg?.linked
+                ? "Бот привязан ✓ Записывайте траты прямо в Telegram — суммы появятся здесь."
+                : "Подключите бота — он подтянет бюджет и цель, примет ежедневные траты и будет напоминать, сколько можно потратить."}
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {tg?.linked && tg.income > 0 ? (
-              <div className="rounded-xl border border-border/60 bg-muted/40 p-4">
-                <p className="text-xs font-medium text-muted-foreground">В этом месяце через бота</p>
-                <div className="mt-2 grid grid-cols-2 gap-3 text-sm">
-                  <div>
-                    <p className="text-muted-foreground">Потрачено</p>
-                    <p className="text-base font-semibold">{fmt(tg.spentMonth)}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground">Осталось</p>
-                    <p className="text-base font-semibold">
-                      {fmt(Math.max(0, tg.remaining))}
-                      <span className="ml-1 text-xs font-normal text-muted-foreground">
-                        ≈ {fmt(tg.perDay)}/день
-                      </span>
-                    </p>
-                  </div>
-                </div>
-                {tg.goalName && tg.goalRemaining > 0 && (
-                  <p className="mt-3 text-xs text-muted-foreground">
-                    🎯 До цели «{tg.goalName}»: осталось {fmt(tg.goalRemaining)}
-                  </p>
-                )}
-                <p className="mt-3 text-xs text-muted-foreground">
-                  Бот привязан ✓ Записывайте траты в Telegram — суммы появятся здесь.
-                </p>
-              </div>
-            ) : tg?.linked ? (
-              <div className="rounded-xl border border-border/60 bg-muted/40 p-4 text-sm text-muted-foreground">
-                Бот привязан ✓ Сохраните расчёт в калькуляторе — бот подтянет бюджет и цель, и начнёт вести
-                ваши траты.
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Подключите бота — он подтянет ваш бюджет и цель, будет принимать ежедневные траты и напоминать,
-                сколько можно потратить.
-              </p>
-            )}
+          <CardContent>
             <TelegramLinkButton />
           </CardContent>
         </Card>

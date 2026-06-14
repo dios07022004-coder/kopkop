@@ -48,6 +48,7 @@ import { AllocationTab } from "@/components/calculator/allocation-tab";
 import { MonthlyTradeoff } from "@/components/calculator/monthly-tradeoff";
 import { DonutChart } from "@/components/calculator/charts";
 import { LockedFeature } from "@/components/calculator/locked-feature";
+import { MonthLedger } from "@/components/account/month-ledger";
 import { cn, formatRub } from "@/lib/utils";
 
 const lock = (key: keyof typeof FREEMIUM.lock) =>
@@ -158,6 +159,9 @@ export function CalculatorApp({ paid = false }: { paid?: boolean }) {
 
       {paid ? (
         <>
+          {/* Живой месяц: траты/доходы из леджера (сайт ↔ бот) */}
+          <MonthLedger />
+
           {/* 3. Вкладки — что делать дальше */}
           <div className="soft-card overflow-hidden">
             <div className="flex border-b border-border/60">

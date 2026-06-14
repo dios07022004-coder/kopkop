@@ -85,10 +85,10 @@ alter table public.telegram_users add column if not exists last_remind_on date;
 alter table public.telegram_users enable row level security;
 -- политик нет → доступ только с service_role (бэкенд бота)
 
--- Дневник трат из Telegram (день в МСК). Привязан к tg_id, опц. к аккаунту.
+-- Единый леджер аккаунта: траты и разовые доходы (сайт + бот). День в МСК.
 create table if not exists public.tg_expenses (
   id bigint generated always as identity primary key,
-  tg_id bigint not null,
+  tg_id bigint,
   user_id uuid references auth.users (id) on delete set null,
   amount integer not null,
   note text,
@@ -96,11 +96,16 @@ create table if not exists public.tg_expenses (
   created_at timestamptz not null default now()
 );
 
+-- Миграция к леджеру (idempotent):
+alter table public.tg_expenses alter column tg_id drop not null;
+alter table public.tg_expenses add column if not exists kind text not null default 'expense';
+alter table public.tg_expenses add column if not exists source text not null default 'tg';
+
 create index if not exists tg_expenses_tg_day_idx on public.tg_expenses (tg_id, day);
 create index if not exists tg_expenses_user_idx on public.tg_expenses (user_id, day);
 
 alter table public.tg_expenses enable row level security;
--- доступ только с service_role (бэкенд бота)
+-- доступ только с service_role (бэкенд бота / API сайта)
 
 -- Одноразовые коды привязки Telegram к аккаунту сайта
 create table if not exists public.tg_link_codes (

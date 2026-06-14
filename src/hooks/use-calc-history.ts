@@ -131,6 +131,8 @@ export function useCalcHistory() {
           throw new Error(error?.message ?? "Не удалось сохранить в аккаунт");
         }
         setItems((prev) => [rowToSnap(data as DbRow), ...prev].slice(0, MAX_ITEMS));
+        // Подтягиваем свежий бюджет/цель в Telegram-бота (если привязан) — fire-and-forget
+        fetch("/api/telegram/push-budget", { method: "POST" }).catch(() => {});
         return true;
       }
       saveLocalSnap(snap, label);
