@@ -14,6 +14,11 @@ export async function hasPaidAccess(): Promise<boolean> {
     return true;
   }
 
+  // Быстрый выход: если нет куки сессии Supabase — пользователь не залогинен,
+  // не делаем медленный сетевой запрос к supabase.co.
+  const hasSbCookie = cookieStore.getAll().some((c) => c.name.includes("-auth-token"));
+  if (!hasSbCookie) return false;
+
   const supabase = await createClient();
   if (!supabase) return false;
 

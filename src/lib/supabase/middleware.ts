@@ -27,7 +27,13 @@ export async function updateSession(request: NextRequest) {
 
   let isAuthenticated = devUser;
 
-  if (supabaseConfigured) {
+  // Не дёргаем Supabase для анонимных посетителей (нет куки сессии) —
+  // иначе каждый заход на /app/login ждёт медленный ответ supabase.co.
+  const hasSupabaseAuthCookie = request.cookies
+    .getAll()
+    .some((c) => c.name.includes("-auth-token"));
+
+  if (supabaseConfigured && hasSupabaseAuthCookie) {
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
