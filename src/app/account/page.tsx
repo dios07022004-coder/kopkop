@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/server";
 import { getProductLinks } from "@/lib/orders";
+import { hasPaidAccess } from "@/lib/access";
 import { DEV_AUTH_COOKIE, getDevAuthConfig, isDevAuthSession } from "@/lib/dev-auth";
 
 export const metadata: Metadata = {
@@ -26,6 +27,11 @@ export default async function AccountPage() {
 
   if (!user && !devUser) {
     redirect("/login?next=/account");
+  }
+
+  // Файлы продукта — только для оплативших (или админа / dev).
+  if (!devUser && !(await hasPaidAccess())) {
+    redirect("/checkout");
   }
 
   const displayEmail = user?.email ?? devConfig?.email ?? "Пользователь";

@@ -1,12 +1,14 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { DEV_AUTH_COOKIE, isDevAuthSession } from "@/lib/dev-auth";
+import { isAdminEmail } from "@/lib/admin";
+import { userHasPaidOrder } from "@/lib/orders";
 
 /**
- * Есть ли у посетителя платный доступ к полной версии калькулятора.
- *
- * Сейчас доступ = наличие сессии (пользователь получает логин после оплаты).
- * TODO (backend): сверять с оплаченным заказом в Supabase, а не только факт сессии.
+ * Доступ к полной версии калькулятора:
+ *  • админ (ADMIN_EMAILS) — всегда;
+ *  • обычный пользователь — только при наличии ОПЛАЧЕННОГО заказа на его email;
+ *  • dev-режим — всегда (локально).
  */
 export async function hasPaidAccess(): Promise<boolean> {
   const cookieStore = await cookies();
@@ -14,8 +16,7 @@ export async function hasPaidAccess(): Promise<boolean> {
     return true;
   }
 
-  // Быстрый выход: если нет куки сессии Supabase — пользователь не залогинен,
-  // не делаем медленный сетевой запрос к supabase.co.
+  // Нет куки сессии → не залогинен → не ходим в сеть.
   const hasSbCookie = cookieStore.getAll().some((c) => c.name.includes("-auth-token"));
   if (!hasSbCookie) return false;
 
@@ -26,5 +27,10 @@ export async function hasPaidAccess(): Promise<boolean> {
     data: { user },
   } = await supabase.auth.getUser();
 
-  return Boolean(user);
+  const email = user?.email;
+  if (!email) return false;
+
+  // Админ — всегда; остальные — только после оплаты.
+  if (isAdminEmail(email)) return true;
+  return userHasPaidOrder(email);
 }

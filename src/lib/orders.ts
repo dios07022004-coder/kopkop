@@ -190,6 +190,25 @@ export async function getAllOrders(): Promise<Order[]> {
   return (await readOrders()).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
+/** Есть ли у этого email хотя бы один оплаченный заказ. */
+export async function userHasPaidOrder(email: string): Promise<boolean> {
+  if (!email) return false;
+  if (dbEnabled()) {
+    const supabase = createAdminClient();
+    const { data } = await supabase
+      .from("orders")
+      .select("id")
+      .ilike("email", email)
+      .eq("status", "paid")
+      .limit(1);
+    return Boolean(data && data.length > 0);
+  }
+  const lower = email.toLowerCase();
+  return (await readOrders()).some(
+    (o) => o.email.toLowerCase() === lower && o.status === "paid",
+  );
+}
+
 export function getProductPrice(): number {
   return Number(process.env.PRODUCT_PRICE ?? 399);
 }
