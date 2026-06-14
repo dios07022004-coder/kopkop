@@ -72,19 +72,34 @@ async function relay(update) {
 }
 
 async function main() {
-  await tgGet("deleteWebhook", { drop_pending_updates: "false" }).catch(() => {});
+  console.log("bot-poll: старт, прокси =", PROXY.replace(/:[^:@]+@/, ":***@"));
+
+  // надёжно снимаем вебхук (иначе getUpdates конфликтует)
+  try {
+    const del = await tgGet("deleteWebhook", { drop_pending_updates: "false" });
+    console.log("bot-poll: deleteWebhook →", JSON.stringify(del));
+  } catch (e) {
+    console.log("bot-poll: deleteWebhook ошибка →", e.message);
+  }
+
   let offset = 0;
-  console.log("bot-poll: запущен, тяну апдейты через прокси");
+  console.log("bot-poll: тяну апдейты через прокси");
   for (;;) {
     try {
-      const res = await tgGet("getUpdates", { offset, timeout: 50 });
-      if (res && res.ok && Array.isArray(res.result)) {
-        for (const upd of res.result) {
-          offset = upd.update_id + 1;
-          await relay(upd);
-        }
+      const res = await tgGet("getUpdates", { offset, timeout: 30 });
+      if (!res || !res.ok) {
+        console.log("bot-poll: getUpdates не ok →", JSON.stringify(res));
+        await new Promise((r) => setTimeout(r, 3000));
+        continue;
       }
-    } catch {
+      for (const upd of res.result) {
+        offset = upd.update_id + 1;
+        const text = upd.message?.text;
+        console.log("bot-poll: апдейт", upd.update_id, "chat", upd.message?.chat?.id, "text", text);
+        await relay(upd);
+      }
+    } catch (e) {
+      console.log("bot-poll: ошибка getUpdates →", e.message);
       await new Promise((r) => setTimeout(r, 3000));
     }
   }
