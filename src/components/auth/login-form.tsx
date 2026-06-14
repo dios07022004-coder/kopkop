@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-type Mode = "login" | "register" | "verify";
+type Mode = "login" | "register" | "verify" | "forgot" | "reset";
 
 function YandexIcon() {
   return (
@@ -30,6 +30,7 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: Mode }) {
   const [mode, setMode] = useState<Mode>(defaultMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
   const [code, setCode] = useState("");
   const [error, setError] = useState(
     searchParams.get("error") ? "Не удалось войти через Яндекс. Попробуйте ещё раз или по почте." : "",
@@ -40,6 +41,12 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: Mode }) {
   function done() {
     router.push(next);
     router.refresh();
+  }
+
+  function switchMode(m: Mode) {
+    setMode(m);
+    setError("");
+    setInfo("");
   }
 
   const yandexHref = `/api/auth/yandex/start?next=${encodeURIComponent(next)}`;
@@ -87,14 +94,13 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: Mode }) {
       });
       setLoading(false);
       if (e2) return setError(e2.message || "Не удалось зарегистрироваться");
-      // Supabase для уже существующего email возвращает пользователя с пустым identities
       if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
         setError("Этот email уже зарегистрирован. Войдите или восстановите пароль.");
         setMode("login");
         return;
       }
       if (data.session) {
-        done(); // подтверждение email отключено — сразу вошли
+        done();
         return;
       }
       setInfo("Мы отправили код на ваш email. Введите его ниже.");
@@ -113,19 +119,61 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: Mode }) {
       done();
       return;
     }
+
+    if (mode === "forgot") {
+      const { error: e4 } = await supabase.auth.resetPasswordForEmail(email);
+      setLoading(false);
+      if (e4) return setError("Не удалось отправить код. Проверьте email.");
+      setInfo("Мы отправили код для смены пароля на email. Введите его и новый пароль.");
+      setMode("reset");
+      return;
+    }
+
+    if (mode === "reset") {
+      const { error: e5 } = await supabase.auth.verifyOtp({
+        email,
+        token: code.trim(),
+        type: "recovery",
+      });
+      if (e5) {
+        setLoading(false);
+        return setError("Неверный или просроченный код");
+      }
+      const { error: e6 } = await supabase.auth.updateUser({ password: newPassword });
+      setLoading(false);
+      if (e6) return setError("Не удалось сменить пароль. Минимум 6 символов.");
+      done();
+      return;
+    }
   }
 
   const titleByMode: Record<Mode, string> = {
     login: "Вход",
     register: "Регистрация",
     verify: "Подтверждение почты",
+    forgot: "Восстановление пароля",
+    reset: "Новый пароль",
   };
+
+  const buttonByMode: Record<Mode, string> = {
+    login: "Войти",
+    register: "Зарегистрироваться",
+    verify: "Подтвердить",
+    forgot: "Отправить код",
+    reset: "Сменить пароль",
+  };
+
+  const showOAuth = mode === "login" || mode === "register";
+  const showEmail = mode === "login" || mode === "register" || mode === "forgot";
+  const showCode = mode === "verify" || mode === "reset";
+  const showPassword = mode === "login" || mode === "register";
+  const showNewPassword = mode === "reset";
 
   return (
     <form onSubmit={onSubmit} className="soft-card mx-auto max-w-md space-y-4 p-6">
       <p className="text-center text-lg font-semibold">{titleByMode[mode]}</p>
 
-      {mode !== "verify" && supabaseReady && (
+      {showOAuth && supabaseReady && (
         <>
           <a
             href={yandexHref}
@@ -142,7 +190,21 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: Mode }) {
         </>
       )}
 
-      {mode === "verify" ? (
+      {showEmail && (
+        <div className="space-y-1.5">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            required
+            value={email}
+            className="h-11"
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </div>
+      )}
+
+      {showCode && (
         <div className="space-y-1.5">
           <Label htmlFor="code">Код из письма</Label>
           <Input
@@ -155,61 +217,67 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: Mode }) {
             onChange={(e) => setCode(e.target.value)}
           />
         </div>
-      ) : (
-        <>
-          <div className="space-y-1.5">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              required
-              value={email}
-              className="h-11"
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="password">Пароль</Label>
-            <Input
-              id="password"
-              type="password"
-              required
-              minLength={6}
-              value={password}
-              className="h-11"
-              onChange={(e) => setPassword(e.target.value)}
-            />
-          </div>
-        </>
+      )}
+
+      {showPassword && (
+        <div className="space-y-1.5">
+          <Label htmlFor="password">Пароль</Label>
+          <Input
+            id="password"
+            type="password"
+            required
+            minLength={6}
+            value={password}
+            className="h-11"
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </div>
+      )}
+
+      {showNewPassword && (
+        <div className="space-y-1.5">
+          <Label htmlFor="newPassword">Новый пароль</Label>
+          <Input
+            id="newPassword"
+            type="password"
+            required
+            minLength={6}
+            value={newPassword}
+            className="h-11"
+            onChange={(e) => setNewPassword(e.target.value)}
+          />
+        </div>
       )}
 
       {error && <p className="text-sm text-[hsl(var(--danger))]">{error}</p>}
       {info && <p className="text-sm text-primary">{info}</p>}
 
       <Button type="submit" className="h-11 w-full" disabled={loading}>
-        {loading
-          ? "…"
-          : mode === "login"
-            ? "Войти"
-            : mode === "register"
-              ? "Зарегистрироваться"
-              : "Подтвердить"}
+        {loading ? "…" : buttonByMode[mode]}
       </Button>
 
       {supabaseReady && mode === "login" && (
-        <p className="text-center text-sm text-muted-foreground">
-          Нет аккаунта?{" "}
-          <button
-            type="button"
-            className="text-primary underline-offset-4 hover:underline"
-            onClick={() => {
-              setMode("register");
-              setError("");
-            }}
-          >
-            Зарегистрироваться
-          </button>
-        </p>
+        <div className="space-y-1 text-center text-sm text-muted-foreground">
+          <p>
+            Нет аккаунта?{" "}
+            <button
+              type="button"
+              className="text-primary underline-offset-4 hover:underline"
+              onClick={() => switchMode("register")}
+            >
+              Зарегистрироваться
+            </button>
+          </p>
+          <p>
+            <button
+              type="button"
+              className="text-primary underline-offset-4 hover:underline"
+              onClick={() => switchMode("forgot")}
+            >
+              Забыли пароль?
+            </button>
+          </p>
+        </div>
       )}
       {supabaseReady && mode === "register" && (
         <p className="text-center text-sm text-muted-foreground">
@@ -217,22 +285,21 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: Mode }) {
           <button
             type="button"
             className="text-primary underline-offset-4 hover:underline"
-            onClick={() => {
-              setMode("login");
-              setError("");
-            }}
+            onClick={() => switchMode("login")}
           >
             Войти
           </button>
         </p>
       )}
-      {mode === "verify" && (
+      {(mode === "verify" || mode === "forgot" || mode === "reset") && (
         <p className="text-center text-xs text-muted-foreground">
-          Не пришёл код? Проверьте папку «Спам» или{" "}
-          <Link href="/login" className="text-primary hover:underline">
-            начните заново
-          </Link>
-          .
+          <button
+            type="button"
+            className="text-primary hover:underline"
+            onClick={() => switchMode("login")}
+          >
+            ← Назад ко входу
+          </button>
         </p>
       )}
     </form>
