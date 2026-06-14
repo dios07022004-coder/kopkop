@@ -78,6 +78,26 @@ export function CalculatorApp({ paid = false }: { paid?: boolean }) {
   const history = useCalcHistory();
   const [copied, setCopied] = useState(false);
   const [tab, setTab] = useState<TabKey>("split");
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  const handleSave = async () => {
+    setSaveState("saving");
+    setSaveError(null);
+    try {
+      await history.save({
+        free: fullResult.core.remainingAfterMandatory,
+        budget,
+        purchase,
+        savingsGoal,
+      });
+      setSaveState("saved");
+      setTimeout(() => setSaveState("idle"), 2500);
+    } catch (e) {
+      setSaveState("error");
+      setSaveError(e instanceof Error ? e.message : "Не удалось сохранить");
+    }
+  };
 
   const computed = useMemo(
     () => applyUiFlagsForCompute({ budget, purchase, savingsGoal, ui }),
@@ -238,22 +258,25 @@ export function CalculatorApp({ paid = false }: { paid?: boolean }) {
           </Accordion>
 
           {/* Сохранить / экспорт */}
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               type="button"
               variant="outline"
               size="sm"
-              onClick={() =>
-                history.save({
-                  free: fullResult.core.remainingAfterMandatory,
-                  budget,
-                  purchase,
-                  savingsGoal,
-                })
-              }
+              onClick={handleSave}
+              disabled={saveState === "saving"}
             >
-              <Save className="mr-2 h-4 w-4" />
-              Сохранить расчёт
+              {saveState === "saved" ? (
+                <>
+                  <Check className="mr-2 h-4 w-4" />
+                  Сохранено
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  {saveState === "saving" ? "Сохраняем…" : "Сохранить расчёт"}
+                </>
+              )}
             </Button>
             <Button
               type="button"
@@ -278,6 +301,11 @@ export function CalculatorApp({ paid = false }: { paid?: boolean }) {
               )}
             </Button>
           </div>
+          {saveState === "error" && (
+            <p className="text-xs text-[hsl(var(--danger))]">
+              Не удалось сохранить в аккаунт: {saveError}. Расчёт сохранён на этом устройстве.
+            </p>
+          )}
 
           {/* Мои расчёты — история */}
           {history.items.length > 0 && (

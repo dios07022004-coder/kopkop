@@ -96,17 +96,27 @@ export function useCalcHistory() {
     };
   }, []);
 
+  const saveLocalSnap = useCallback((snap: Omit<CalcSnapshot, "id" | "label">, label: string) => {
+    const item: CalcSnapshot = { ...snap, id: `${new Date().getTime()}`, label };
+    setItems((prev) => {
+      const next = [item, ...prev].slice(0, MAX_ITEMS);
+      saveLocal(next);
+      return next;
+    });
+  }, []);
+
+  /** Сохранить расчёт. Возвращает true при успехе, иначе бросает понятную ошибку. */
   const save = useCallback(
     async (snap: Omit<CalcSnapshot, "id" | "label">) => {
       const label = nowLabel();
       if (userId) {
         const supabase = createClient();
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from("calculations")
           .insert({
             user_id: userId,
             label,
-            free: snap.free,
+            free: Math.round(snap.free),
             payload: {
               budget: snap.budget,
               purchase: snap.purchase,
@@ -115,17 +125,18 @@ export function useCalcHistory() {
           })
           .select("id,label,free,payload")
           .single();
-        if (data) setItems((prev) => [rowToSnap(data as DbRow), ...prev].slice(0, MAX_ITEMS));
-      } else {
-        const item: CalcSnapshot = { ...snap, id: `${new Date().getTime()}`, label };
-        setItems((prev) => {
-          const next = [item, ...prev].slice(0, MAX_ITEMS);
-          saveLocal(next);
-          return next;
-        });
+        if (error || !data) {
+          // не теряем расчёт пользователя — кладём локально и сообщаем об ошибке
+          saveLocalSnap(snap, label);
+          throw new Error(error?.message ?? "Не удалось сохранить в аккаунт");
+        }
+        setItems((prev) => [rowToSnap(data as DbRow), ...prev].slice(0, MAX_ITEMS));
+        return true;
       }
+      saveLocalSnap(snap, label);
+      return true;
     },
-    [userId],
+    [userId, saveLocalSnap],
   );
 
   const remove = useCallback(
