@@ -100,7 +100,7 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: Mode }) {
       const { error: e3 } = await supabase.auth.verifyOtp({
         email,
         token: code.trim(),
-        type: "email",
+        type: "signup",
       });
       setLoading(false);
       if (e3) return setError("Неверный или просроченный код");
