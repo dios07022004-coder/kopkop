@@ -77,6 +77,14 @@ create table if not exists public.telegram_users (
 alter table public.telegram_users enable row level security;
 -- политик нет → доступ только с service_role (бэкенд бота)
 
+-- Одноразовые коды привязки Telegram к аккаунту сайта
+create table if not exists public.tg_link_codes (
+  code text primary key,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+alter table public.tg_link_codes enable row level security;
+
 create policy "Users can read own orders"
   on public.orders for select
   using (auth.uid() = user_id);

@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { createClient } from "@/lib/supabase/server";
 import { getProductLinks } from "@/lib/orders";
 import { hasPaidAccess } from "@/lib/access";
+import { TelegramLinkButton } from "@/components/account/telegram-link-button";
 import { DEV_AUTH_COOKIE, getDevAuthConfig, isDevAuthSession } from "@/lib/dev-auth";
 
 export const metadata: Metadata = {
@@ -86,6 +87,16 @@ export default async function AccountPage() {
                 HTML-инструкция
               </a>
             </Button>
+          </CardContent>
+        </Card>
+
+        <Card className="soft-card mt-4">
+          <CardHeader>
+            <CardTitle>Telegram-бот</CardTitle>
+            <CardDescription>Проверяйте покупки прямо в Telegram — бот подтянет ваш бюджет</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <TelegramLinkButton />
           </CardContent>
         </Card>
       </div>

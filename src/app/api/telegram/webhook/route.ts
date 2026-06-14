@@ -13,6 +13,7 @@ type TgUser = {
   mandatory: number;
   savings: number;
   step: string | null;
+  user_id: string | null;
 };
 
 async function getUser(tgId: number): Promise<TgUser> {
@@ -20,7 +21,55 @@ async function getUser(tgId: number): Promise<TgUser> {
   const { data } = await supabase.from("telegram_users").select("*").eq("tg_id", tgId).maybeSingle();
   if (data) return data as TgUser;
   await supabase.from("telegram_users").insert({ tg_id: tgId });
-  return { tg_id: tgId, income: 0, mandatory: 0, savings: 0, step: null };
+  return { tg_id: tgId, income: 0, mandatory: 0, savings: 0, step: null, user_id: null };
+}
+
+/** Привязка Telegram к аккаунту сайта по одноразовому коду + подтягивание бюджета. */
+async function linkAccount(chatId: number, code: string) {
+  const supabase = createAdminClient();
+  const { data: row } = await supabase
+    .from("tg_link_codes")
+    .select("user_id")
+    .eq("code", code)
+    .maybeSingle();
+
+  if (!row) {
+    await tgSend(chatId, `⚠️ Ссылка привязки устарела. Получите новую на сайте: ${SITE}/account`);
+    return;
+  }
+  const userId = (row as { user_id: string }).user_id;
+
+  // последний сохранённый расчёт пользователя
+  const { data: calc } = await supabase
+    .from("calculations")
+    .select("payload")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const budget = (
+    calc as { payload?: { budget?: { incomeMonthly?: number; mandatoryMonthly?: number; savingsMonthly?: number } } } | null
+  )?.payload?.budget;
+
+  await getUser(chatId);
+  await patchUser(chatId, {
+    user_id: userId,
+    step: null,
+    income: budget?.incomeMonthly ?? 0,
+    mandatory: budget?.mandatoryMonthly ?? 0,
+    savings: budget?.savingsMonthly ?? 0,
+  });
+  await supabase.from("tg_link_codes").delete().eq("code", code);
+
+  const u = await getUser(chatId);
+  if (u.income > 0) {
+    await tgSend(chatId, `✅ Аккаунт привязан! Подтянул твой бюджет.\n\n${planText(u)}`);
+  } else {
+    await tgSend(
+      chatId,
+      `✅ Аккаунт привязан! Сохрани расчёт на сайте (${SITE}/app) — и я подтяну цифры. Или настрой здесь: /setup`,
+    );
+  }
 }
 
 async function patchUser(tgId: number, patch: Partial<TgUser>) {
@@ -75,7 +124,12 @@ async function handle(chatId: number, text: string) {
   const t = text.trim();
   const lower = t.toLowerCase();
 
-  if (lower === "/start") {
+  if (lower.startsWith("/start")) {
+    const code = t.split(/\s+/)[1];
+    if (code) {
+      await linkAccount(chatId, code);
+      return;
+    }
     await patchUser(chatId, { step: null });
     await tgSend(
       chatId,
