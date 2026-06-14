@@ -82,7 +82,7 @@ export default async function AdminPage() {
   const revenue = paid.reduce((s, o) => s + o.amount, 0);
   const dailyPoints = buildDailyPoints(orders);
   const sourcePoints = buildSourcePoints(orders);
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://kopkop.ru";
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://kapkapmoney.ru";
 
   let users: { email: string; created: string; lastSignIn: string | null }[] = [];
   if (isSupabaseAdminConfigured()) {
