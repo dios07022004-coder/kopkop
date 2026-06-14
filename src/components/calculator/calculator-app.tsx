@@ -158,7 +158,7 @@ export function CalculatorApp({ paid = false }: { paid?: boolean }) {
                 </button>
               ))}
             </div>
-            <div className="p-5 sm:p-6">
+            <div key={tab} className="animate-float-in p-5 sm:p-6">
               {tab === "split" && (
                 <AllocationTab
                   base={fullResult.core.remainingAfterMandatory}

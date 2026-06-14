@@ -7,6 +7,8 @@ import {
   HowItWorksSection,
   HowPaidWorksSection,
   PricingSection,
+  StatsStrip,
+  TestimonialsSection,
   ThreeToolsSection,
   WorkedExampleSection,
 } from "@/components/landing/sections";
@@ -67,11 +69,13 @@ export default function HomePage() {
     <>
       <JsonLd data={homepageJsonLd} />
       <HeroSection />
+      <StatsStrip />
       <Reveal><BeforeAfterSection /></Reveal>
       <Reveal><HowItWorksSection /></Reveal>
       <Reveal><WorkedExampleSection /></Reveal>
       <Reveal><ThreeToolsSection /></Reveal>
       <Reveal><HowPaidWorksSection /></Reveal>
+      <Reveal><TestimonialsSection /></Reveal>
       <Reveal><PricingSection /></Reveal>
       <Reveal><ForWhomScenariosSection /></Reveal>
       <Reveal><FaqPreviewSection /></Reveal>

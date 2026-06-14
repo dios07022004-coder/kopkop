@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { formatRub } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
@@ -116,6 +117,13 @@ export function DonutChart({
   const c = 2 * Math.PI * r;
   let offset = 0;
 
+  // «рисующаяся» анимация при появлении
+  const [drawn, setDrawn] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setDrawn(true), 60);
+    return () => clearTimeout(t);
+  }, []);
+
   return (
     <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-center sm:gap-8">
       <div className="relative shrink-0">
@@ -133,8 +141,12 @@ export function DonutChart({
                 fill="none"
                 stroke={DONUT_PALETTE[i % DONUT_PALETTE.length]}
                 strokeWidth="18"
-                strokeDasharray={dash}
+                strokeDasharray={drawn ? dash : `0 ${c}`}
                 strokeDashoffset={-offset}
+                style={{
+                  transition: "stroke-dasharray 0.7s ease",
+                  transitionDelay: `${i * 80}ms`,
+                }}
               />
             );
             offset += len;

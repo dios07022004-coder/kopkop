@@ -1,5 +1,17 @@
 import Link from "next/link";
-import { ArrowRight, CheckCircle2, Lock, X } from "lucide-react";
+import {
+  ArrowRight,
+  Calculator,
+  CheckCircle2,
+  ListChecks,
+  Lock,
+  PiggyBank,
+  PieChart,
+  Quote,
+  ShoppingCart,
+  Wallet,
+  X,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -22,6 +34,7 @@ import {
   HOW_PAID_WORKS,
   PRODUCT,
   SIMPLE_EXPLANATION,
+  TESTIMONIALS,
   THREE_TOOLS,
   WORKED_EXAMPLE,
 } from "@/data/content";
@@ -150,18 +163,25 @@ export function FreemiumSection() {
   );
 }
 
+const HOW_ICONS = [ListChecks, Calculator, CheckCircle2];
+
 export function HowItWorksSection() {
   return (
     <Section id="how" title={SIMPLE_EXPLANATION.title} className="bg-secondary/30">
       <div className="grid gap-4 sm:grid-cols-3 sm:gap-6">
-        {SIMPLE_EXPLANATION.steps.map((step, i) => (
-          <div key={step.title} className="soft-card hover-lift p-5 sm:p-6">
-            <span className="text-3xl">{step.emoji}</span>
-            <p className="mt-3 text-xs font-medium text-muted-foreground">Шаг {i + 1}</p>
-            <h3 className="mt-1 text-lg font-semibold">{step.title}</h3>
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{step.text}</p>
-          </div>
-        ))}
+        {SIMPLE_EXPLANATION.steps.map((step, i) => {
+          const Icon = HOW_ICONS[i] ?? ListChecks;
+          return (
+            <div key={step.title} className="soft-card hover-lift p-5 sm:p-6">
+              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <Icon className="h-5 w-5" />
+              </span>
+              <p className="mt-3 text-xs font-medium text-muted-foreground">Шаг {i + 1}</p>
+              <h3 className="mt-1 text-lg font-semibold">{step.title}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{step.text}</p>
+            </div>
+          );
+        })}
       </div>
     </Section>
   );
@@ -319,21 +339,29 @@ export function HowPaidWorksSection() {
   );
 }
 
+const TOOL_ICONS = [Wallet, PiggyBank, ShoppingCart];
+
 export function ThreeToolsSection() {
   return (
     <Section id="tools" title={THREE_TOOLS.title} subtitle={THREE_TOOLS.subtitle}>
       <div className="grid gap-4 sm:grid-cols-3 sm:gap-6">
-        {THREE_TOOLS.tools.map((tool) => (
-          <div key={tool.name} className="soft-card hover-lift p-5 sm:p-6">
-            <h3 className="text-lg font-semibold">{tool.name}</h3>
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              {tool.description}
-            </p>
-            <p className="mt-4 rounded-lg bg-secondary/60 px-3 py-2 text-xs font-medium text-muted-foreground">
-              {tool.preview}
-            </p>
-          </div>
-        ))}
+        {THREE_TOOLS.tools.map((tool, i) => {
+          const Icon = TOOL_ICONS[i] ?? Wallet;
+          return (
+            <div key={tool.name} className="soft-card hover-lift p-5 sm:p-6">
+              <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <Icon className="h-5 w-5" />
+              </span>
+              <h3 className="mt-3 text-lg font-semibold">{tool.name}</h3>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                {tool.description}
+              </p>
+              <p className="mt-4 rounded-lg bg-secondary/60 px-3 py-2 text-xs font-medium text-muted-foreground">
+                {tool.preview}
+              </p>
+            </div>
+          );
+        })}
       </div>
     </Section>
   );
@@ -416,6 +444,61 @@ export function ForWhomScenariosSection() {
             <div className="text-3xl">{item.emoji}</div>
             <h3 className="mt-3 font-semibold">{item.title}</h3>
             <p className="mt-2 text-sm text-muted-foreground">{item.example}</p>
+          </article>
+        ))}
+      </div>
+    </Section>
+  );
+}
+
+const STATS = [
+  { value: "30 сек", label: "до первого ответа" },
+  { value: "5 полей", label: "весь ввод" },
+  { value: "399 ₽", label: "разово, без подписки" },
+  { value: "3 решения", label: "тратить · копить · купить" },
+];
+
+export function StatsStrip() {
+  return (
+    <section className="border-y border-border/60 bg-secondary/30 py-8">
+      <div className="page-container">
+        <div className="mx-auto grid max-w-4xl grid-cols-2 gap-6 text-center sm:grid-cols-4">
+          {STATS.map((s) => (
+            <div key={s.label}>
+              <p className="text-2xl font-bold text-primary sm:text-3xl">{s.value}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{s.label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+const AVATAR_COLORS = ["bg-primary", "bg-[hsl(180_50%_42%)]", "bg-[hsl(262_52%_58%)]"];
+
+export function TestimonialsSection() {
+  return (
+    <Section title="Что говорят пользователи" className="bg-secondary/30">
+      <div className="grid gap-4 sm:grid-cols-3 sm:gap-6">
+        {TESTIMONIALS.map((t, i) => (
+          <article key={t.name} className="soft-card hover-lift relative p-5 sm:p-6">
+            <Quote className="absolute right-4 top-4 h-6 w-6 text-primary/15" />
+            <p className="text-sm leading-relaxed">{t.text}</p>
+            <div className="mt-5 flex items-center gap-3">
+              <span
+                className={cn(
+                  "flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold text-white",
+                  AVATAR_COLORS[i % AVATAR_COLORS.length],
+                )}
+              >
+                {t.name.charAt(0)}
+              </span>
+              <div>
+                <p className="text-sm font-semibold">{t.name}</p>
+                <p className="text-xs text-muted-foreground">{t.role}</p>
+              </div>
+            </div>
           </article>
         ))}
       </div>
