@@ -62,6 +62,21 @@ create policy "own calc insert" on public.calculations for insert with check (au
 drop policy if exists "own calc delete" on public.calculations;
 create policy "own calc delete" on public.calculations for delete using (auth.uid() = user_id);
 
+-- Пользователи Telegram-бота (доступ только через service role)
+create table if not exists public.telegram_users (
+  tg_id bigint primary key,
+  income integer not null default 0,
+  mandatory integer not null default 0,
+  savings integer not null default 0,
+  step text,
+  user_id uuid references auth.users (id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.telegram_users enable row level security;
+-- политик нет → доступ только с service_role (бэкенд бота)
+
 create policy "Users can read own orders"
   on public.orders for select
   using (auth.uid() = user_id);

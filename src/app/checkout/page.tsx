@@ -1,10 +1,15 @@
+import { redirect } from "next/navigation";
 import { CheckoutForm } from "@/components/checkout/checkout-form";
 import { Card, CardContent } from "@/components/ui/card";
 import { Breadcrumbs } from "@/components/seo/breadcrumbs";
 import { JsonLd } from "@/components/seo/json-ld";
-import { CheckCircle2, Mail, ShieldCheck } from "lucide-react";
+import { CheckCircle2, ShieldCheck, Zap } from "lucide-react";
 import { FREEMIUM, PRODUCT } from "@/data/content";
+import { createClient } from "@/lib/supabase/server";
+import { hasPaidAccess } from "@/lib/access";
 import { absoluteUrl, buildPageMetadata } from "@/lib/seo/metadata";
+
+export const dynamic = "force-dynamic";
 
 export const metadata = buildPageMetadata({
   title: "Оформление заказа — калькулятор бюджета",
@@ -35,7 +40,12 @@ const checkoutJsonLd = {
   ],
 };
 
-export default function CheckoutPage() {
+export default async function CheckoutPage() {
+  // Уже оплачено → в кабинет.
+  if (await hasPaidAccess()) redirect("/account");
+  const supabase = await createClient();
+  const authed = Boolean(supabase && (await supabase.auth.getUser()).data.user);
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6">
       <JsonLd data={checkoutJsonLd} />
@@ -47,9 +57,9 @@ export default function CheckoutPage() {
       />
       <div className="grid gap-8 lg:grid-cols-2 lg:gap-12">
         <div>
-          <h1 className="text-3xl font-bold">Оформление заказа</h1>
+          <h1 className="text-3xl font-bold">Полная версия</h1>
           <p className="mt-3 text-muted-foreground">
-            После оплаты вы получите мгновенный доступ к файлам и письмо на email.
+            Разовая оплата — доступ привяжется к вашему аккаунту автоматически.
           </p>
 
           <Card className="mt-8">
@@ -78,13 +88,13 @@ export default function CheckoutPage() {
               Оплата защищена YooKassa — карты, СБП, кошельки. Данные карты мы не видим.
             </p>
             <p className="flex items-start gap-2">
-              <Mail className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-              Сразу после оплаты на email придёт логин, пароль и ссылки на файлы.
+              <Zap className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+              Доступ открывается сразу после оплаты — в том же аккаунте, без ввода почты.
             </p>
           </div>
         </div>
 
-        <CheckoutForm />
+        <CheckoutForm authed={authed} />
       </div>
     </div>
   );

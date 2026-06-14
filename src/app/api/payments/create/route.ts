@@ -1,21 +1,23 @@
 import { NextResponse } from "next/server";
-import { checkoutSchema } from "@/lib/validations";
 import { createOrder, getProductPrice } from "@/lib/orders";
 import { createYooKassaPayment } from "@/lib/yookassa";
+import { createClient } from "@/lib/supabase/server";
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const parsed = checkoutSchema.safeParse(body);
+    const body = await request.json().catch(() => ({}));
 
-    if (!parsed.success) {
+    // Оплата по аккаунту: email берём из сессии, форма не нужна.
+    const supabase = await createClient();
+    const user = supabase ? (await supabase.auth.getUser()).data.user : null;
+    if (!user?.email) {
       return NextResponse.json(
-        { error: parsed.error.errors[0]?.message ?? "Некорректные данные" },
-        { status: 400 },
+        { error: "Войдите в аккаунт, чтобы оплатить" },
+        { status: 401 },
       );
     }
-
-    const { email, name } = parsed.data;
+    const email = user.email;
+    const name = (user.user_metadata?.full_name as string | undefined) ?? "";
     const amount = getProductPrice();
 
     // UTM-метки (необязательно) — для атрибуции трафика в админке
