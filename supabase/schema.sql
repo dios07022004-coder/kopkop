@@ -74,8 +74,33 @@ create table if not exists public.telegram_users (
   updated_at timestamptz not null default now()
 );
 
+-- Дневник трат + цель + напоминания (миграция, idempotent)
+alter table public.telegram_users add column if not exists goal_name text;
+alter table public.telegram_users add column if not exists goal_target integer not null default 0;
+alter table public.telegram_users add column if not exists goal_saved integer not null default 0;
+alter table public.telegram_users add column if not exists synced_at timestamptz;
+alter table public.telegram_users add column if not exists remind_daily boolean not null default true;
+alter table public.telegram_users add column if not exists last_remind_on date;
+
 alter table public.telegram_users enable row level security;
 -- политик нет → доступ только с service_role (бэкенд бота)
+
+-- Дневник трат из Telegram (день в МСК). Привязан к tg_id, опц. к аккаунту.
+create table if not exists public.tg_expenses (
+  id bigint generated always as identity primary key,
+  tg_id bigint not null,
+  user_id uuid references auth.users (id) on delete set null,
+  amount integer not null,
+  note text,
+  day date not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists tg_expenses_tg_day_idx on public.tg_expenses (tg_id, day);
+create index if not exists tg_expenses_user_idx on public.tg_expenses (user_id, day);
+
+alter table public.tg_expenses enable row level security;
+-- доступ только с service_role (бэкенд бота)
 
 -- Одноразовые коды привязки Telegram к аккаунту сайта
 create table if not exists public.tg_link_codes (

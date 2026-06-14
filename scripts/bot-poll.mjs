@@ -29,6 +29,8 @@ const PROXY = env.TELEGRAM_PROXY_URL || process.env.TELEGRAM_PROXY_URL;
 const SECRET = env.TELEGRAM_WEBHOOK_SECRET || process.env.TELEGRAM_WEBHOOK_SECRET || "";
 const PORT = env.PORT || process.env.PORT || "3000";
 const WEBHOOK = `http://127.0.0.1:${PORT}/api/telegram/webhook`;
+const CRON = `http://127.0.0.1:${PORT}/api/telegram/cron`;
+const CRON_EVERY_MS = 10 * 60 * 1000; // раз в 10 минут дёргаем напоминания
 
 if (!TOKEN || !PROXY) {
   console.error("bot-poll: нет TELEGRAM_BOT_TOKEN или TELEGRAM_PROXY_URL в .env.local");
@@ -71,6 +73,22 @@ async function relay(update) {
   }).catch(() => {});
 }
 
+let lastCronAt = 0;
+async function tickCron() {
+  if (Date.now() - lastCronAt < CRON_EVERY_MS) return;
+  lastCronAt = Date.now();
+  try {
+    const r = await fetch(CRON, {
+      method: "POST",
+      headers: { "x-telegram-bot-api-secret-token": SECRET },
+    });
+    const j = await r.json().catch(() => ({}));
+    if (j && j.sent > 0) console.log("bot-poll: напоминаний отправлено", j.sent);
+  } catch {
+    /* ignore */
+  }
+}
+
 async function main() {
   console.log("bot-poll: старт, прокси =", PROXY.replace(/:[^:@]+@/, ":***@"));
 
@@ -85,6 +103,7 @@ async function main() {
   let offset = 0;
   console.log("bot-poll: тяну апдейты через прокси");
   for (;;) {
+    await tickCron();
     try {
       const res = await tgGet("getUpdates", { offset, timeout: 30 });
       if (!res || !res.ok) {
