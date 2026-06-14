@@ -1,14 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { NAV_LINKS, PRODUCT } from "@/data/content";
+import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
 export function Header() {
   const [open, setOpen] = useState(false);
+  const [authed, setAuthed] = useState(false);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+    const supabase = createClient();
+    // getSession читает локально (без сетевого запроса к supabase.co)
+    supabase.auth.getSession().then(({ data }) => setAuthed(Boolean(data.session)));
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) =>
+      setAuthed(Boolean(session)),
+    );
+    return () => sub.subscription.unsubscribe();
+  }, []);
 
   return (
     <>
@@ -38,12 +51,25 @@ export function Header() {
           </nav>
 
           <div className="flex items-center gap-2">
-            <Button variant="ghost" size="sm" className="hidden sm:inline-flex" asChild>
-              <Link href="/login">Войти</Link>
-            </Button>
-            <Button size="sm" className="rounded-xl px-4" asChild>
-              <Link href="/checkout">{PRODUCT.price} ₽</Link>
-            </Button>
+            {authed ? (
+              <>
+                <Button variant="ghost" size="sm" className="hidden sm:inline-flex" asChild>
+                  <Link href="/app">Кабинет</Link>
+                </Button>
+                <Button variant="outline" size="sm" className="rounded-xl px-4" asChild>
+                  <a href="/auth/signout">Выйти</a>
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="ghost" size="sm" className="hidden sm:inline-flex" asChild>
+                  <Link href="/login">Войти</Link>
+                </Button>
+                <Button size="sm" className="rounded-xl px-4" asChild>
+                  <Link href="/checkout">{PRODUCT.price} ₽</Link>
+                </Button>
+              </>
+            )}
             <button
               type="button"
               aria-label={open ? "Закрыть меню" : "Открыть меню"}
@@ -86,25 +112,36 @@ export function Header() {
               {link.label}
             </Link>
           ))}
-          <Link
-            href="/login"
-            className="rounded-xl px-4 py-3.5 text-base active:bg-accent"
-            onClick={() => setOpen(false)}
-          >
-            Войти
-          </Link>
+          {authed ? (
+            <a
+              href="/auth/signout"
+              className="rounded-xl px-4 py-3.5 text-base active:bg-accent"
+            >
+              Выйти
+            </a>
+          ) : (
+            <Link
+              href="/login"
+              className="rounded-xl px-4 py-3.5 text-base active:bg-accent"
+              onClick={() => setOpen(false)}
+            >
+              Войти
+            </Link>
+          )}
         </div>
         <div className="mt-auto flex flex-col gap-2 pt-6">
           <Button variant="outline" size="lg" className="w-full rounded-xl" asChild>
             <Link href="/app" onClick={() => setOpen(false)}>
-              Посчитать бесплатно
+              {authed ? "Открыть калькулятор" : "Посчитать бесплатно"}
             </Link>
           </Button>
-          <Button size="lg" className="w-full rounded-xl" asChild>
-            <Link href="/checkout" onClick={() => setOpen(false)}>
-              Полная версия — {PRODUCT.price} ₽
-            </Link>
-          </Button>
+          {!authed && (
+            <Button size="lg" className="w-full rounded-xl" asChild>
+              <Link href="/checkout" onClick={() => setOpen(false)}>
+                Полная версия — {PRODUCT.price} ₽
+              </Link>
+            </Button>
+          )}
         </div>
       </nav>
     </>

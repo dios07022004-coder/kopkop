@@ -120,13 +120,26 @@
     box-shadow: 0 12px 32px -8px rgba(15, 23, 42, 0.14);
   }
 
-  /* Мягкий «дышащий» фон для hero */
+  /* Живой «дышащий» aurora-фон для hero */
   .hero-aurora {
     position: relative;
+    isolation: isolate;
+  }
+  .hero-aurora::before {
+    content: "";
+    position: absolute;
+    inset: -25%;
+    z-index: -1;
     background:
-      radial-gradient(60% 50% at 15% 0%, hsl(158 64% 92% / 0.9) 0%, transparent 60%),
-      radial-gradient(50% 45% at 95% 10%, hsl(180 55% 90% / 0.8) 0%, transparent 55%),
-      radial-gradient(40% 40% at 50% 100%, hsl(158 50% 94% / 0.7) 0%, transparent 60%);
+      radial-gradient(38% 45% at 18% 8%, hsl(158 64% 90% / 0.95) 0%, transparent 60%),
+      radial-gradient(34% 40% at 90% 12%, hsl(180 60% 88% / 0.85) 0%, transparent 55%),
+      radial-gradient(40% 45% at 55% 100%, hsl(158 55% 92% / 0.8) 0%, transparent 60%);
+    animation: aurora 16s ease-in-out infinite alternate;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .hero-aurora::before {
+      animation: none;
+    }
   }
 }
 
@@ -143,6 +156,15 @@
   }
   .animate-float-in {
     animation: float-in 0.7s ease-out both;
+  }
+
+  @keyframes aurora {
+    0% {
+      transform: translate3d(0, 0, 0) scale(1);
+    }
+    100% {
+      transform: translate3d(-2%, -3%, 0) scale(1.08);
+    }
   }
 }
 

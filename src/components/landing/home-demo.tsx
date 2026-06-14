@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,31 @@ import { Label } from "@/components/ui/label";
 import { MoneyWaterfall, type WaterfallStep } from "@/components/calculator/charts";
 import { computeFinance } from "@/lib/finance";
 import { cn, formatRub } from "@/lib/utils";
+
+/** Плавный «прирост» числа при изменении (премиальная микроанимация). */
+function useCountUp(value: number, duration = 450) {
+  const [display, setDisplay] = useState(value);
+  const fromRef = useRef(value);
+  useEffect(() => {
+    if (typeof requestAnimationFrame === "undefined") {
+      setDisplay(value);
+      return;
+    }
+    const from = fromRef.current;
+    const start = performance.now();
+    let raf = 0;
+    const tick = (now: number) => {
+      const t = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - t, 3);
+      setDisplay(Math.round(from + (value - from) * eased));
+      if (t < 1) raf = requestAnimationFrame(tick);
+      else fromRef.current = value;
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [value, duration]);
+  return display;
+}
 
 const MOOD = {
   healthy: { dot: "bg-[hsl(var(--success))]", ring: "surface-success", label: "Можно тратить спокойно" },
@@ -59,6 +84,7 @@ export function HomeDemo() {
   );
 
   const free = result.core.freeBudgetMonthly;
+  const animatedFree = useCountUp(free);
   const mood: keyof typeof MOOD =
     free < 0 ? "danger" : free < 5000 ? "caution" : "healthy";
   const perDay = Math.max(0, Math.round(free / 30));
@@ -94,7 +120,7 @@ export function HomeDemo() {
               free < 0 ? "text-[hsl(var(--danger))]" : "text-primary",
             )}
           >
-            {formatRub(free)}
+            {formatRub(animatedFree)}
           </p>
           {free > 0 && (
             <p className="mt-1 text-sm text-muted-foreground">≈ {formatRub(perDay)} в день</p>
