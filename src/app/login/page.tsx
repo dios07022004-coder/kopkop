@@ -17,7 +17,7 @@ export default function LoginPage() {
       <div className="mx-auto mb-8 max-w-md text-center">
         <h1 className="text-2xl font-bold">Вход</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Войдите через Google или по email
+          Войдите через Яндекс или по email
         </p>
       </div>
       <Suspense>
