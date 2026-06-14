@@ -1,4 +1,9 @@
-/** Минимальный клиент Telegram Bot API. */
+import https from "https";
+import { SocksProxyAgent } from "socks-proxy-agent";
+
+/** Минимальный клиент Telegram Bot API.
+ * Запросы к Telegram идут через SOCKS5-прокси (TELEGRAM_PROXY_URL), т.к. из РФ
+ * api.telegram.org заблокирован. Всё остальное в приложении ходит напрямую. */
 
 export function isTelegramConfigured(): boolean {
   return Boolean(process.env.TELEGRAM_BOT_TOKEN);
@@ -6,6 +11,55 @@ export function isTelegramConfigured(): boolean {
 
 function api(method: string): string {
   return `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/${method}`;
+}
+
+let cachedAgent: SocksProxyAgent | undefined | null = null;
+function proxyAgent(): SocksProxyAgent | undefined {
+  if (cachedAgent !== null) return cachedAgent ?? undefined;
+  const url = process.env.TELEGRAM_PROXY_URL;
+  cachedAgent = url ? new SocksProxyAgent(url) : undefined;
+  return cachedAgent ?? undefined;
+}
+
+/** POST в Telegram API. Через прокси (https.request) или напрямую (fetch). */
+async function callTelegram(method: string, payload: unknown): Promise<void> {
+  const body = JSON.stringify(payload);
+  const agent = proxyAgent();
+
+  if (!agent) {
+    await fetch(api(method), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body,
+    }).catch(() => {});
+    return;
+  }
+
+  await new Promise<void>((resolve) => {
+    const req = https.request(
+      api(method),
+      {
+        method: "POST",
+        agent,
+        headers: {
+          "Content-Type": "application/json",
+          "Content-Length": Buffer.byteLength(body),
+        },
+        timeout: 15000,
+      },
+      (res) => {
+        res.on("data", () => {});
+        res.on("end", () => resolve());
+      },
+    );
+    req.on("error", () => resolve());
+    req.on("timeout", () => {
+      req.destroy();
+      resolve();
+    });
+    req.write(body);
+    req.end();
+  });
 }
 
 export async function tgSend(
@@ -17,17 +71,13 @@ export async function tgSend(
     ? { keyboard: options.keyboard.map((row) => row.map((t) => ({ text: t }))), resize_keyboard: true }
     : undefined;
 
-  await fetch(api("sendMessage"), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      parse_mode: "HTML",
-      disable_web_page_preview: true,
-      reply_markup,
-    }),
-  }).catch(() => {});
+  await callTelegram("sendMessage", {
+    chat_id: chatId,
+    text,
+    parse_mode: "HTML",
+    disable_web_page_preview: true,
+    reply_markup,
+  });
 }
 
 /** Достаёт последнюю сумму из текста и подпись (всё до суммы). */
