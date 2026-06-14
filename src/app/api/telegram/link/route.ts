@@ -22,6 +22,10 @@ export async function POST() {
   await admin.from("tg_link_codes").insert({ code, user_id: user.id });
 
   return NextResponse.json({
-    url: `https://t.me/${botUsername}?start=${code}`,
+    // tg:// открывает приложение Telegram напрямую (t.me заблокирован в РФ)
+    appUrl: `tg://resolve?domain=${botUsername}&start=${code}`,
+    webUrl: `https://t.me/${botUsername}?start=${code}`,
+    username: botUsername,
+    code,
   });
 }

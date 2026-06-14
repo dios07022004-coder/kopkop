@@ -7,10 +7,10 @@ import { Button } from "@/components/ui/button";
 const BOT = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME;
 
 /**
- * Кнопка «в Telegram». Для залогиненных создаёт привязочную ссылку
- * (t.me/<bot>?start=<code> — бот подтянет бюджет к аккаунту). Если не залогинен
- * или что-то пошло не так — открывает бота напрямую (t.me/<bot>), чтобы поток
- * в Telegram не прерывался. Никогда не «висит»: есть таймаут.
+ * Кнопка «в Telegram». Открывает приложение Telegram напрямую через схему
+ * tg://resolve (t.me в РФ заблокирован и «висит»). Для залогиненных создаёт
+ * привязочный код (бот подтянет бюджет к аккаунту); иначе просто открывает бота.
+ * Никогда не «висит»: есть таймаут и видимый ручной фолбэк.
  */
 export function TelegramLinkButton({
   label = "Подключить Telegram-бота",
@@ -23,13 +23,14 @@ export function TelegramLinkButton({
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [opened, setOpened] = useState(false);
 
-  const openBot = () => {
-    if (BOT) {
-      window.location.href = `https://t.me/${BOT}`;
-      return true;
-    }
-    return false;
+  const openApp = (code?: string) => {
+    if (!BOT) return false;
+    const tg = code ? `tg://resolve?domain=${BOT}&start=${code}` : `tg://resolve?domain=${BOT}`;
+    window.location.href = tg;
+    setOpened(true);
+    return true;
   };
 
   const connect = async () => {
@@ -43,23 +44,33 @@ export function TelegramLinkButton({
 
       if (res.status === 401) {
         // не залогинен — всё равно ведём в бота (привяжет аккаунт позже)
-        if (openBot()) return;
+        if (openApp()) {
+          setLoading(false);
+          return;
+        }
         setError("Войдите в аккаунт, чтобы привязать бота");
         setLoading(false);
         return;
       }
 
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data.url) {
-        if (openBot()) return;
+      if (!res.ok || !data.appUrl) {
+        if (openApp()) {
+          setLoading(false);
+          return;
+        }
         setError(data.error ?? "Бот пока не настроен");
         setLoading(false);
         return;
       }
-      window.location.href = data.url; // привязочная ссылка
+      openApp(data.code); // привязочный код → бот подтянет бюджет
+      setLoading(false);
     } catch {
       // таймаут/сеть — пробуем открыть бота напрямую
-      if (openBot()) return;
+      if (openApp()) {
+        setLoading(false);
+        return;
+      }
       setError("Не удалось создать ссылку. Попробуйте ещё раз.");
       setLoading(false);
     }
@@ -69,8 +80,24 @@ export function TelegramLinkButton({
     <div>
       <Button className={className} variant={variant} onClick={connect} disabled={loading}>
         <Send className="mr-2 h-4 w-4" />
-        {loading ? "Открываем Telegram…" : label}
+        {loading ? "Открываем Telegram…" : opened ? "Открыть Telegram ещё раз" : label}
       </Button>
+
+      {opened && (
+        <div className="mt-3 space-y-1 rounded-lg border border-border/60 bg-muted/40 p-3 text-xs text-muted-foreground">
+          <p className="font-medium text-foreground">Telegram не открылся?</p>
+          <p>
+            Откройте приложение Telegram, найдите бота{" "}
+            {BOT && (
+              <a href={`tg://resolve?domain=${BOT}`} className="font-medium text-primary underline">
+                @{BOT}
+              </a>
+            )}{" "}
+            и нажмите <span className="font-medium">Запустить / Start</span>.
+          </p>
+        </div>
+      )}
+
       {error && <p className="mt-2 text-xs text-[hsl(var(--danger))]">{error}</p>}
     </div>
   );
