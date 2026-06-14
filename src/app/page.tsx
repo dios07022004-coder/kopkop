@@ -11,6 +11,7 @@ import {
   WorkedExampleSection,
 } from "@/components/landing/sections";
 import { MobileStickyCta } from "@/components/landing/mobile-sticky-cta";
+import { Reveal } from "@/components/landing/reveal";
 import { JsonLd } from "@/components/seo/json-ld";
 import { FAQ_ITEMS, PRODUCT } from "@/data/content";
 import { absoluteUrl, buildPageMetadata } from "@/lib/seo/metadata";
@@ -66,15 +67,15 @@ export default function HomePage() {
     <>
       <JsonLd data={homepageJsonLd} />
       <HeroSection />
-      <BeforeAfterSection />
-      <HowItWorksSection />
-      <WorkedExampleSection />
-      <ThreeToolsSection />
-      <HowPaidWorksSection />
-      <PricingSection />
-      <ForWhomScenariosSection />
-      <FaqPreviewSection />
-      <CtaSection />
+      <Reveal><BeforeAfterSection /></Reveal>
+      <Reveal><HowItWorksSection /></Reveal>
+      <Reveal><WorkedExampleSection /></Reveal>
+      <Reveal><ThreeToolsSection /></Reveal>
+      <Reveal><HowPaidWorksSection /></Reveal>
+      <Reveal><PricingSection /></Reveal>
+      <Reveal><ForWhomScenariosSection /></Reveal>
+      <Reveal><FaqPreviewSection /></Reveal>
+      <Reveal><CtaSection /></Reveal>
       <MobileStickyCta />
       <div className="h-16 sm:hidden" aria-hidden />
     </>

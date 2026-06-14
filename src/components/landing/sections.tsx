@@ -44,22 +44,35 @@ const EXAMPLE_SURFACE = {
 
 export function HeroSection() {
   return (
-    <section className="brand-gradient relative overflow-hidden pb-14 pt-10 sm:pb-20 sm:pt-16">
+    <section className="hero-aurora relative overflow-hidden pb-14 pt-12 sm:pb-20 sm:pt-20">
       <div className="page-container">
         <div className="mx-auto max-w-3xl text-center">
-          <Badge variant="secondary" className="mb-5 rounded-full px-4 py-1">
+          <Badge
+            variant="secondary"
+            className="animate-float-in mb-5 rounded-full px-4 py-1"
+            style={{ animationDelay: "0ms" }}
+          >
             {HERO.badge}
           </Badge>
-          <h1 className="text-balance text-[1.9rem] font-bold leading-tight tracking-tight sm:text-5xl">
+          <h1
+            className="animate-float-in text-balance text-[2rem] font-bold leading-[1.1] tracking-tight sm:text-[3.25rem]"
+            style={{ animationDelay: "80ms" }}
+          >
             {HERO.title}
           </h1>
-          <p className="mx-auto mt-4 max-w-xl text-base leading-relaxed text-muted-foreground sm:mt-6 sm:text-xl">
+          <p
+            className="animate-float-in mx-auto mt-4 max-w-xl text-base leading-relaxed text-muted-foreground sm:mt-6 sm:text-lg"
+            style={{ animationDelay: "160ms" }}
+          >
             {HERO.subtitle}
           </p>
-          <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
+          <div
+            className="animate-float-in mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center"
+            style={{ animationDelay: "240ms" }}
+          >
             <Button
               size="lg"
-              className="h-12 w-full max-w-sm rounded-xl text-base sm:w-auto sm:px-10"
+              className="h-12 w-full max-w-sm rounded-xl text-base shadow-md transition-transform hover:scale-[1.02] sm:w-auto sm:px-10"
               asChild
             >
               <Link href="/app">
@@ -76,13 +89,16 @@ export function HeroSection() {
               <Link href="/checkout">{withPrice(HERO.ctaBuy)}</Link>
             </Button>
           </div>
-          <p className="mt-3 text-xs text-muted-foreground sm:text-sm">
+          <p
+            className="animate-float-in mt-3 text-xs text-muted-foreground sm:text-sm"
+            style={{ animationDelay: "320ms" }}
+          >
             {withPrice(HERO.note)}
           </p>
         </div>
 
         {/* Живое мини-демо — считаем прямо здесь */}
-        <div className="mx-auto mt-10 max-w-3xl">
+        <div className="animate-float-in mx-auto mt-10 max-w-3xl" style={{ animationDelay: "400ms" }}>
           <HomeDemo />
         </div>
       </div>
@@ -98,7 +114,7 @@ export function FreemiumSection() {
       subtitle="Базовый расчёт — без оплаты и регистрации. Готовый план действий — в полной версии."
     >
       <div className="mx-auto grid max-w-4xl gap-4 sm:grid-cols-2 sm:gap-6">
-        <div className="soft-card p-6">
+        <div className="soft-card hover-lift p-6">
           <p className="text-sm font-semibold text-muted-foreground">{FREEMIUM.free.title}</p>
           <ul className="mt-4 space-y-3">
             {FREEMIUM.free.items.map((item) => (
@@ -112,7 +128,7 @@ export function FreemiumSection() {
             <Link href="/app">Посчитать бесплатно</Link>
           </Button>
         </div>
-        <div className="soft-card border-primary/30 bg-primary/5 p-6">
+        <div className="soft-card hover-lift border-primary/30 bg-primary/5 p-6">
           <p className="flex items-center gap-1.5 text-sm font-semibold text-primary">
             <Lock className="h-3.5 w-3.5" />
             {withPrice(FREEMIUM.paid.title)}
@@ -139,7 +155,7 @@ export function HowItWorksSection() {
     <Section id="how" title={SIMPLE_EXPLANATION.title} className="bg-secondary/30">
       <div className="grid gap-4 sm:grid-cols-3 sm:gap-6">
         {SIMPLE_EXPLANATION.steps.map((step, i) => (
-          <div key={step.title} className="soft-card p-5 sm:p-6">
+          <div key={step.title} className="soft-card hover-lift p-5 sm:p-6">
             <span className="text-3xl">{step.emoji}</span>
             <p className="mt-3 text-xs font-medium text-muted-foreground">Шаг {i + 1}</p>
             <h3 className="mt-1 text-lg font-semibold">{step.title}</h3>
@@ -155,7 +171,7 @@ export function BeforeAfterSection() {
   return (
     <Section title={BEFORE_AFTER.title} className="bg-secondary/30">
       <div className="mx-auto grid max-w-4xl gap-4 sm:grid-cols-2 sm:gap-6">
-        <div className="soft-card p-5 sm:p-6">
+        <div className="soft-card hover-lift p-5 sm:p-6">
           <p className="text-sm font-medium text-muted-foreground">Было</p>
           <ul className="mt-4 space-y-3">
             {BEFORE_AFTER.before.map((item) => (
@@ -166,7 +182,7 @@ export function BeforeAfterSection() {
             ))}
           </ul>
         </div>
-        <div className="soft-card border-primary/30 p-5 sm:p-6">
+        <div className="soft-card hover-lift border-primary/30 p-5 sm:p-6">
           <p className="text-sm font-medium text-primary">Стало</p>
           <ul className="mt-4 space-y-3">
             {BEFORE_AFTER.after.map((item) => (
@@ -188,7 +204,7 @@ export function WorkedExampleSection() {
     <Section title={ex.title} subtitle={ex.subtitle} className="bg-secondary/30">
       <div className="mx-auto max-w-3xl space-y-4">
         {/* Что вводит */}
-        <div className="soft-card p-5 sm:p-6">
+        <div className="soft-card hover-lift p-5 sm:p-6">
           <p className="text-sm font-semibold text-muted-foreground">Аня вводит 4 цифры</p>
           <ul className="mt-3 space-y-2">
             {ex.inputs.map((i) => (
@@ -201,7 +217,7 @@ export function WorkedExampleSection() {
         </div>
 
         {/* Главный ответ */}
-        <div className="soft-card border-primary/30 p-5 text-center sm:p-6">
+        <div className="soft-card hover-lift border-primary/30 p-5 text-center sm:p-6">
           <p className="text-sm text-muted-foreground">Свободно на жизнь</p>
           <p className="mt-1 text-4xl font-bold text-primary">{ex.free.value}</p>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -213,7 +229,7 @@ export function WorkedExampleSection() {
         </div>
 
         {/* Куда тратить */}
-        <div className="soft-card p-5 sm:p-6">
+        <div className="soft-card hover-lift p-5 sm:p-6">
           <p className="font-semibold">{ex.distribute.title}</p>
           <p className="mt-1 text-sm text-muted-foreground">{ex.distribute.note}</p>
           <ul className="mt-4 space-y-3">
@@ -233,7 +249,7 @@ export function WorkedExampleSection() {
 
         {/* Накопить + Купить */}
         <div className="grid gap-4 sm:grid-cols-2">
-          <div className="soft-card p-5 sm:p-6">
+          <div className="soft-card hover-lift p-5 sm:p-6">
             <p className="font-semibold">{ex.save.title}</p>
             <p className="mt-1 text-sm text-muted-foreground">{ex.save.goal}</p>
             <div className="mt-3 grid grid-cols-2 gap-3">
@@ -248,7 +264,7 @@ export function WorkedExampleSection() {
             </div>
             <p className="mt-3 text-sm text-muted-foreground">{ex.save.insight}</p>
           </div>
-          <div className="soft-card p-5 sm:p-6">
+          <div className="soft-card hover-lift p-5 sm:p-6">
             <p className="font-semibold">{ex.buy.title}</p>
             <p className="mt-1 text-sm text-muted-foreground">{ex.buy.item}</p>
             <p className="mt-3 inline-block rounded-lg surface-success border px-3 py-1.5 text-sm font-semibold">
@@ -270,7 +286,7 @@ export function HowPaidWorksSection() {
   return (
     <Section title={HOW_PAID_WORKS.title} subtitle={HOW_PAID_WORKS.subtitle}>
       <div className="mx-auto grid max-w-4xl gap-4 sm:grid-cols-2 sm:gap-6">
-        <div className="soft-card p-6">
+        <div className="soft-card hover-lift p-6">
           <p className="text-sm font-semibold text-muted-foreground">{HOW_PAID_WORKS.free.title}</p>
           <ul className="mt-4 space-y-3">
             {HOW_PAID_WORKS.free.items.map((item) => (
@@ -281,7 +297,7 @@ export function HowPaidWorksSection() {
             ))}
           </ul>
         </div>
-        <div className="soft-card border-primary/30 bg-primary/5 p-6">
+        <div className="soft-card hover-lift border-primary/30 bg-primary/5 p-6">
           <p className="flex items-center gap-1.5 text-sm font-semibold text-primary">
             <Lock className="h-3.5 w-3.5" />
             {HOW_PAID_WORKS.paid.title}
@@ -308,7 +324,7 @@ export function ThreeToolsSection() {
     <Section id="tools" title={THREE_TOOLS.title} subtitle={THREE_TOOLS.subtitle}>
       <div className="grid gap-4 sm:grid-cols-3 sm:gap-6">
         {THREE_TOOLS.tools.map((tool) => (
-          <div key={tool.name} className="soft-card p-5 sm:p-6">
+          <div key={tool.name} className="soft-card hover-lift p-5 sm:p-6">
             <h3 className="text-lg font-semibold">{tool.name}</h3>
             <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
               {tool.description}
@@ -350,7 +366,7 @@ export function PricingSection() {
       subtitle="Полный доступ к калькулятору, шаблону и инструкции"
     >
       <div className="mx-auto max-w-sm">
-        <Card className="soft-card overflow-hidden border-primary/30">
+        <Card className="soft-card hover-lift overflow-hidden border-primary/30">
           <CardHeader className="bg-accent/50 text-center">
             <CardDescription>
               <span className="line-through">консультация {PRODUCT.anchorPrice}+ ₽</span>
@@ -396,7 +412,7 @@ export function ForWhomScenariosSection() {
     <Section title={FOR_WHOM_SCENARIOS.title} subtitle={FOR_WHOM_SCENARIOS.subtitle}>
       <div className="grid gap-4 sm:grid-cols-3">
         {FOR_WHOM_SCENARIOS.items.map((item) => (
-          <article key={item.title} className="soft-card p-5 text-center sm:p-6">
+          <article key={item.title} className="soft-card hover-lift p-5 text-center sm:p-6">
             <div className="text-3xl">{item.emoji}</div>
             <h3 className="mt-3 font-semibold">{item.title}</h3>
             <p className="mt-2 text-sm text-muted-foreground">{item.example}</p>
