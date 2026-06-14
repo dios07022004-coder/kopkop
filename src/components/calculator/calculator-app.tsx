@@ -34,7 +34,7 @@ import {
   useDemoStorage,
 } from "@/hooks/use-demo-storage";
 import { useCalcHistory } from "@/hooks/use-calc-history";
-import { downloadPlanCsv } from "@/lib/export-csv";
+import { downloadPlanXlsx } from "@/lib/export-xlsx";
 import { PlanInputs } from "@/components/calculator/plan-inputs";
 import { PlanPresets } from "@/components/calculator/plan-presets";
 import { GoalSectionContent } from "@/components/calculator/goal-section";
@@ -259,10 +259,10 @@ export function CalculatorApp({ paid = false }: { paid?: boolean }) {
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => downloadPlanCsv(budget, fullResult)}
+              onClick={() => downloadPlanXlsx(budget, fullResult, { savingsGoal, purchase })}
             >
               <Download className="mr-2 h-4 w-4" />
-              Скачать в таблицу (.csv)
+              Скачать таблицу (Excel)
             </Button>
             <Button type="button" variant="outline" size="sm" onClick={handleCopy}>
               {copied ? (

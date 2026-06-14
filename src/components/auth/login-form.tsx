@@ -87,6 +87,12 @@ export function AuthForm({ defaultMode = "login" }: { defaultMode?: Mode }) {
       });
       setLoading(false);
       if (e2) return setError(e2.message || "Не удалось зарегистрироваться");
+      // Supabase для уже существующего email возвращает пользователя с пустым identities
+      if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+        setError("Этот email уже зарегистрирован. Войдите или восстановите пароль.");
+        setMode("login");
+        return;
+      }
       if (data.session) {
         done(); // подтверждение email отключено — сразу вошли
         return;

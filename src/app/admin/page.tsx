@@ -73,6 +73,37 @@ function buildSourcePoints(orders: Order[]): SourcePoint[] {
   return [...map.values()].sort((a, b) => b.count - a.count).slice(0, 8);
 }
 
+interface UtmRow {
+  source: string;
+  medium: string;
+  campaign: string;
+  content: string;
+  count: number;
+  paid: number;
+  revenue: number;
+}
+
+/** Группировка по полной UTM-метке (= по каждой ссылке). */
+function buildUtmRows(orders: Order[]): UtmRow[] {
+  const map = new Map<string, UtmRow>();
+  for (const o of orders) {
+    const source = o.utm?.source || "—";
+    const medium = o.utm?.medium || "—";
+    const campaign = o.utm?.campaign || "—";
+    const content = o.utm?.content || "—";
+    const key = `${source}|${medium}|${campaign}|${content}`;
+    const cur =
+      map.get(key) ?? { source, medium, campaign, content, count: 0, paid: 0, revenue: 0 };
+    cur.count += 1;
+    if (o.status === "paid") {
+      cur.paid += 1;
+      cur.revenue += o.amount;
+    }
+    map.set(key, cur);
+  }
+  return [...map.values()].sort((a, b) => b.count - a.count);
+}
+
 export default async function AdminPage() {
   const admin = await getAdminUser();
   if (!admin) redirect("/login?next=/admin");
@@ -82,6 +113,7 @@ export default async function AdminPage() {
   const revenue = paid.reduce((s, o) => s + o.amount, 0);
   const dailyPoints = buildDailyPoints(orders);
   const sourcePoints = buildSourcePoints(orders);
+  const utmRows = buildUtmRows(orders);
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://kapkapmoney.ru";
 
   let users: { email: string; created: string; lastSignIn: string | null }[] = [];
@@ -133,6 +165,53 @@ export default async function AdminPage() {
       {/* UTM-конструктор */}
       <section className="mt-6">
         <UtmBuilder baseUrl={siteUrl} />
+      </section>
+
+      {/* Трафик по каждой UTM-метке */}
+      <section className="mt-10">
+        <h2 className="mb-1 text-lg font-semibold">Трафик по UTM-меткам</h2>
+        <p className="mb-3 text-sm text-muted-foreground">
+          Конверсия по каждой ссылке (заказы и оплаты). Полную статистику переходов смотрите в
+          Яндекс.Метрике по тем же меткам.
+        </p>
+        <div className="soft-card overflow-x-auto">
+          <table className="w-full min-w-[680px] text-sm">
+            <thead className="border-b border-border/60 text-left text-muted-foreground">
+              <tr>
+                <th className="px-4 py-3 font-medium">Источник</th>
+                <th className="px-4 py-3 font-medium">Канал</th>
+                <th className="px-4 py-3 font-medium">Кампания</th>
+                <th className="px-4 py-3 font-medium">Объявление</th>
+                <th className="px-4 py-3 font-medium">Заказы</th>
+                <th className="px-4 py-3 font-medium">Оплаты</th>
+                <th className="px-4 py-3 font-medium">Выручка</th>
+              </tr>
+            </thead>
+            <tbody>
+              {utmRows.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-4 py-6 text-center text-muted-foreground">
+                    Пока нет заказов с метками
+                  </td>
+                </tr>
+              )}
+              {utmRows.map((r) => (
+                <tr
+                  key={`${r.source}|${r.medium}|${r.campaign}|${r.content}`}
+                  className="border-b border-border/40 last:border-0"
+                >
+                  <td className="px-4 py-3">{r.source}</td>
+                  <td className="px-4 py-3">{r.medium}</td>
+                  <td className="px-4 py-3">{r.campaign}</td>
+                  <td className="px-4 py-3">{r.content}</td>
+                  <td className="px-4 py-3">{r.count}</td>
+                  <td className="px-4 py-3">{r.paid}</td>
+                  <td className="px-4 py-3 whitespace-nowrap font-medium">{formatRub(r.revenue)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       {/* Оплаты */}

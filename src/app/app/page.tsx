@@ -22,9 +22,14 @@ export default async function AppPage() {
           <p className="mt-2 text-muted-foreground">{CALCULATOR_PAGE.subtitle}</p>
         </div>
         {paid && (
-          <Button variant="outline" size="sm" className="shrink-0" asChild>
-            <Link href="/account">Файлы</Link>
-          </Button>
+          <div className="flex shrink-0 gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/account">Файлы</Link>
+            </Button>
+            <Button variant="ghost" size="sm" asChild>
+              <a href="/auth/signout">Выйти</a>
+            </Button>
+          </div>
         )}
       </div>
       <CalculatorApp paid={paid} />

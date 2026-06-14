@@ -34,10 +34,15 @@ export default async function AccountPage() {
   return (
     <div className="page-container py-10 sm:py-12">
       <div className="mx-auto max-w-lg">
-        <h1 className="text-2xl font-bold">Ваш доступ</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          {displayEmail}
-        </p>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold">Ваш доступ</h1>
+            <p className="mt-2 text-sm text-muted-foreground">{displayEmail}</p>
+          </div>
+          <Button variant="ghost" size="sm" className="shrink-0" asChild>
+            <a href="/auth/signout">Выйти</a>
+          </Button>
+        </div>
 
         <Card className="soft-card mt-8">
           <CardHeader>
