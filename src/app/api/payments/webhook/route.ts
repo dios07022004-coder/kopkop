@@ -6,7 +6,7 @@ import {
 } from "@/lib/orders";
 import { provisionUserAfterPayment } from "@/lib/auth-provision";
 import { sendAccessEmail } from "@/lib/email";
-import { getYooKassaPayment, isPaymentSuccessful } from "@/lib/yookassa";
+import { getYooKassaPayment, isPaymentSuccessful, paymentMatchesAmount } from "@/lib/yookassa";
 
 export async function POST(request: Request) {
   try {
@@ -42,6 +42,12 @@ export async function POST(request: Request) {
     if (!order) {
       console.error("Order not found for payment:", paymentId);
       return NextResponse.json({ error: "Order not found" }, { status: 404 });
+    }
+
+    // Безопасность: сумма платежа должна совпадать с заказом
+    if (!paymentMatchesAmount(payment, order.amount)) {
+      console.error("Payment amount mismatch:", paymentId, payment.amount, "expected", order.amount);
+      return NextResponse.json({ error: "Amount mismatch" }, { status: 400 });
     }
 
     if (order.status !== "paid") {

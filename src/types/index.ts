@@ -99,6 +99,10 @@ export interface YooKassaPaymentResponse {
   id: string;
   status: string;
   paid: boolean;
+  amount?: {
+    value: string;
+    currency: string;
+  };
   confirmation?: {
     type: string;
     confirmation_url?: string;

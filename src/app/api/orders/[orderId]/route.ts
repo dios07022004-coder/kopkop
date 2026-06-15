@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getOrderById, getProductLinks } from "@/lib/orders";
-import { getYooKassaPayment, isPaymentSuccessful } from "@/lib/yookassa";
+import { getYooKassaPayment, isPaymentSuccessful, paymentMatchesAmount } from "@/lib/yookassa";
 import { updateOrderStatus } from "@/lib/orders";
 
 export async function GET(
@@ -19,7 +19,7 @@ export async function GET(
     if (order.status === "pending" && order.yookassaPaymentId) {
       try {
         const payment = await getYooKassaPayment(order.yookassaPaymentId);
-        if (isPaymentSuccessful(payment)) {
+        if (isPaymentSuccessful(payment) && paymentMatchesAmount(payment, order.amount)) {
           await updateOrderStatus(order.id, "paid", payment.id);
           order.status = "paid";
         }

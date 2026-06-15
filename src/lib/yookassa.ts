@@ -107,3 +107,16 @@ export function isPaymentSuccessful(
 ): boolean {
   return payment.status === "succeeded" && payment.paid === true;
 }
+
+/**
+ * Безопасность: сумма и валюта платежа должны совпадать с заказом.
+ * Защищает от подмены (оплатить 1 ₽ и получить доступ за 399 ₽).
+ */
+export function paymentMatchesAmount(
+  payment: YooKassaPaymentResponse,
+  expectedRub: number,
+): boolean {
+  const value = Number(payment.amount?.value);
+  if (!Number.isFinite(value)) return false;
+  return payment.amount?.currency === "RUB" && Math.round(value) >= Math.round(expectedRub);
+}
