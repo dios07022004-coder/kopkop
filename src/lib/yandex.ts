@@ -13,6 +13,8 @@ export function yandexAuthorizeUrl(redirectUri: string, state: string): string {
     client_id: process.env.YANDEX_CLIENT_ID!,
     redirect_uri: redirectUri,
     scope: "login:email login:info",
+    // заново показываем окно согласия — чтобы выдались новые права (email)
+    force_confirm: "yes",
     state,
   });
   return `https://oauth.yandex.ru/authorize?${params.toString()}`;
@@ -51,12 +53,16 @@ export async function yandexGetUser(
     headers: { Authorization: `OAuth ${accessToken}` },
   });
   const data = (await res.json()) as {
+    login?: string;
     default_email?: string;
     emails?: string[];
     real_name?: string;
     display_name?: string;
   };
   const email = data.default_email ?? data.emails?.[0];
-  if (!email) throw new Error("Яндекс не вернул email");
+  if (!email) {
+    console.error("yandex userinfo (нет email). Поля ответа:", Object.keys(data), "login:", data.login);
+    throw new Error("Яндекс не вернул email");
+  }
   return { email, name: data.real_name ?? data.display_name };
 }
