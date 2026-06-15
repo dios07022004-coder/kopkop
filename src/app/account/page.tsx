@@ -10,6 +10,7 @@ import { getProductLinks } from "@/lib/orders";
 import { hasPaidAccess } from "@/lib/access";
 import { TelegramLinkButton } from "@/components/account/telegram-link-button";
 import { MonthLedger } from "@/components/account/month-ledger";
+import { InstallApp } from "@/components/account/install-app";
 import { getMonthSummaryByUser } from "@/lib/telegram-bot";
 import { isSupabaseAdminConfigured } from "@/lib/supabase/admin";
 import { DEV_AUTH_COOKIE, getDevAuthConfig, isDevAuthSession } from "@/lib/dev-auth";
@@ -114,6 +115,8 @@ export default async function AccountPage() {
             <TelegramLinkButton />
           </CardContent>
         </Card>
+
+        <InstallApp />
       </div>
     </div>
   );
