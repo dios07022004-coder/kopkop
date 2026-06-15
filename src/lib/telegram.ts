@@ -76,14 +76,22 @@ async function callTelegram(method: string, payload: unknown): Promise<void> {
   });
 }
 
+export type InlineButton = { text: string; callback_data: string };
+
 export async function tgSend(
   chatId: number,
   text: string,
-  options?: { keyboard?: string[][] },
+  options?: { keyboard?: string[][]; inlineKeyboard?: InlineButton[][] },
 ): Promise<void> {
-  const reply_markup = options?.keyboard
-    ? { keyboard: options.keyboard.map((row) => row.map((t) => ({ text: t }))), resize_keyboard: true }
-    : undefined;
+  let reply_markup: unknown;
+  if (options?.inlineKeyboard) {
+    reply_markup = { inline_keyboard: options.inlineKeyboard };
+  } else if (options?.keyboard) {
+    reply_markup = {
+      keyboard: options.keyboard.map((row) => row.map((t) => ({ text: t }))),
+      resize_keyboard: true,
+    };
+  }
 
   await callTelegram("sendMessage", {
     chat_id: chatId,
@@ -92,6 +100,11 @@ export async function tgSend(
     disable_web_page_preview: true,
     reply_markup,
   });
+}
+
+/** Убирает «часики» на инлайн-кнопке после нажатия (и опц. показывает всплывашку). */
+export async function tgAnswerCallback(callbackQueryId: string, text?: string): Promise<void> {
+  await callTelegram("answerCallbackQuery", { callback_query_id: callbackQueryId, text });
 }
 
 /** Достаёт последнюю сумму из текста и подпись (всё до суммы). */

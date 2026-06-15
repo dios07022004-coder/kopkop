@@ -1,6 +1,6 @@
 import { computeFinance } from "@/lib/finance";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { tgSend, parsePurchase } from "@/lib/telegram";
+import { tgSend, tgAnswerCallback, parsePurchase } from "@/lib/telegram";
 import { userHasPaidOrder } from "@/lib/orders";
 import { isAdminEmail } from "@/lib/admin";
 
@@ -207,9 +207,10 @@ async function undoLastToday(u: TgUser): Promise<{ amount: number; kind: string 
 // ── Тексты ─────────────────────────────────────────────────────────────
 const KB = {
   keyboard: [
-    ["➖ Трата", "📊 Остаток"],
-    ["🎯 Цель", "🛒 Можно купить?"],
-    ["🔄 Обновить с сайта", "ℹ️ Помощь"],
+    ["➖ Трата", "➕ Доход"],
+    ["📊 Остаток", "🎯 Цель"],
+    ["📋 Шаблоны", "🛒 Можно купить?"],
+    ["🔄 Обновить", "ℹ️ Помощь"],
   ],
 };
 
@@ -315,6 +316,20 @@ async function latestPayload(userId: string): Promise<Payload | null> {
   return (data as { payload?: Payload } | null)?.payload ?? null;
 }
 
+type Template = { id: string; label: string | null; free: number | null; payload: Payload };
+
+/** Сохранённые расчёты (шаблоны) аккаунта — для выбора в боте. */
+async function listTemplates(userId: string): Promise<Template[]> {
+  const supabase = createAdminClient();
+  const { data } = await supabase
+    .from("calculations")
+    .select("id,label,free,payload")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(8);
+  return (data ?? []) as Template[];
+}
+
 function patchFromPayload(p: Payload | null): Partial<TgUser> {
   const b = p?.budget;
   const g = p?.savingsGoal;
@@ -381,9 +396,12 @@ async function syncFromSite(u: TgUser): Promise<boolean> {
 // ── Главный обработчик входящих сообщений ──────────────────────────────
 const BTN: Record<string, string> = {
   "➖ трата": "/spent",
+  "➕ доход": "/income",
   "📊 остаток": "/left",
   "🎯 цель": "/goal",
+  "📋 шаблоны": "/templates",
   "🛒 можно купить?": "/buy",
+  "🔄 обновить": "/sync",
   "🔄 обновить с сайта": "/sync",
   "ℹ️ помощь": "/help",
 };
@@ -417,15 +435,15 @@ export async function handleMessage(chatId: number, rawText: string) {
   if (lower === "/help") {
     await tgSend(
       chatId,
-      `ℹ️ <b>Как пользоваться</b>\n\n` +
-        `• Пиши траты — <i>500</i> или <i>кофе 300</i>. Я веду месяц.\n` +
-        `• Прилетели деньги? Пиши <i>+5000 премия</i> — разовый доход.\n` +
-        `• 📊 Остаток — сколько ещё можно тратить и в день\n` +
-        `• 🎯 Цель — сколько осталось копить\n` +
-        `• 🛒 Можно купить? — проверю крупную покупку\n` +
-        `• /undo — удалить последнюю запись\n` +
-        `• /setup — настроить бюджет вручную\n` +
-        `• 🔄 Обновить с сайта — подтянуть свежий бюджет и цель\n\n` +
+      `ℹ️ <b>Как пользоваться</b> (всё на кнопках внизу)\n\n` +
+        `• <b>➖ Трата</b> — записать трату (или просто пришли <i>кофе 300</i>)\n` +
+        `• <b>➕ Доход</b> — записать пришедшие деньги (или <i>+5000 премия</i>)\n` +
+        `• <b>📊 Остаток</b> — сколько ещё можно тратить и в день\n` +
+        `• <b>🎯 Цель</b> — сколько осталось копить\n` +
+        `• <b>📋 Шаблоны</b> — выбрать сохранённый расчёт как активный бюджет\n` +
+        `• <b>🛒 Можно купить?</b> — проверю крупную покупку\n` +
+        `• <b>🔄 Обновить</b> — подтянуть свежий бюджет и цель с сайта\n` +
+        `• /undo — удалить последнюю запись\n\n` +
         `Полная версия (категории, история, графики): ${SITE}?utm_source=tg`,
       { keyboard: KB.keyboard },
     );
@@ -458,6 +476,49 @@ export async function handleMessage(chatId: number, rawText: string) {
     }
     const fresh = await getUser(chatId);
     await tgSend(chatId, `🔄 Обновил бюджет и цель с сайта.\n\n${planText(fresh)}`, { keyboard: KB.keyboard });
+    return;
+  }
+
+  // ── 📋 Шаблоны: выбор сохранённого расчёта (с датой) как активного бюджета ──
+  if (lower === "/templates") {
+    if (!u.user_id) {
+      await tgSend(
+        chatId,
+        `Сначала привяжи аккаунт: открой ${SITE}/account → «Подключить Telegram-бота».`,
+        { keyboard: KB.keyboard },
+      );
+      return;
+    }
+    const tpls = await listTemplates(u.user_id);
+    if (!tpls.length) {
+      await tgSend(
+        chatId,
+        `У тебя пока нет сохранённых шаблонов. Посчитай и нажми «Сохранить расчёт» на сайте (${SITE}/app) — он появится здесь. Либо настрой вручную: /setup`,
+        { keyboard: KB.keyboard },
+      );
+      return;
+    }
+    const inline = tpls.map((t) => [
+      {
+        text: `${t.label || "Расчёт"} · ${fmt(t.free ?? 0)} своб.`,
+        callback_data: `tpl:${t.id}`,
+      },
+    ]);
+    await tgSend(chatId, `📋 <b>Твои шаблоны</b>\nВыбери активный — буду считать месяц по нему:`, {
+      inlineKeyboard: inline,
+    });
+    return;
+  }
+
+  // ── ➕ Доход: разовый доход (или сразу «/income 5000 премия») ──
+  if (lower.startsWith("/income")) {
+    const rest = t.replace(/^\/income\s*/i, "").trim();
+    if (!rest) {
+      await patchUser(chatId, { step: "addincome" });
+      await tgSend(chatId, `Сколько пришло? Пришли сумму, например <i>5000</i> или <i>премия 5000</i>.`);
+      return;
+    }
+    await recordEntry(chatId, rest, "income");
     return;
   }
 
@@ -580,6 +641,12 @@ export async function handleMessage(chatId: number, rawText: string) {
     return;
   }
 
+  if (u.step === "addincome") {
+    await patchUser(chatId, { step: null });
+    await recordEntry(chatId, t, "income");
+    return;
+  }
+
   // ── «+5000 премия» = разовый доход (прилетели деньги) ──
   if (t.startsWith("+")) {
     if (u.income <= 0) {
@@ -611,9 +678,48 @@ export async function handleMessage(chatId: number, rawText: string) {
 
   await tgSend(
     chatId,
-    `Не понял 🤔 Пиши траты суммой (<i>кофе 300</i>), или жми кнопки: 📊 Остаток · 🎯 Цель · 🛒 Можно купить?`,
+    `Не понял 🤔 Пиши траты суммой (<i>кофе 300</i>), доход — <i>+5000</i>, или жми кнопки внизу.`,
     { keyboard: KB.keyboard },
   );
+}
+
+/** Обработка нажатий инлайн-кнопок (callback_query), напр. выбор шаблона. */
+export async function handleCallback(chatId: number, data: string, callbackId: string) {
+  const u = await getUser(chatId);
+
+  // пейволл — как и для сообщений
+  if (!(await hasPaidAccessForUser(u.user_id))) {
+    await tgAnswerCallback(callbackId, "Доступ только после оплаты");
+    await tgSend(chatId, paywallText(Boolean(u.user_id)), { keyboard: KB.keyboard });
+    return;
+  }
+
+  if (data.startsWith("tpl:")) {
+    const id = data.slice(4);
+    const supabase = createAdminClient();
+    const { data: row } = await supabase
+      .from("calculations")
+      .select("label,payload")
+      .eq("id", id)
+      .eq("user_id", u.user_id as string)
+      .maybeSingle();
+    if (!row) {
+      await tgAnswerCallback(callbackId, "Шаблон не найден");
+      return;
+    }
+    const r = row as { label: string | null; payload: Payload };
+    await patchUser(chatId, patchFromPayload(r.payload));
+    await tgAnswerCallback(callbackId, "Шаблон применён ✅");
+    const fresh = await getUser(chatId);
+    await tgSend(
+      chatId,
+      `✅ Активный шаблон: <b>${r.label || "расчёт"}</b>\n\n${planText(fresh)}`,
+      { keyboard: KB.keyboard },
+    );
+    return;
+  }
+
+  await tgAnswerCallback(callbackId);
 }
 
 /** Записать запись леджера (трату или разовый доход) и показать остаток. */

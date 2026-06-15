@@ -1,6 +1,6 @@
 import { isSupabaseAdminConfigured } from "@/lib/supabase/admin";
 import { isTelegramConfigured } from "@/lib/telegram";
-import { handleMessage } from "@/lib/telegram-bot";
+import { handleMessage, handleCallback } from "@/lib/telegram-bot";
 
 export async function POST(request: Request) {
   // Безопасность: секрет вебхука Telegram
@@ -21,6 +21,12 @@ export async function POST(request: Request) {
 
   try {
     const update = await request.json();
+    const cb = update?.callback_query;
+    if (cb?.data && cb.message?.chat?.id) {
+      console.log("tg webhook: callback", cb.message.chat.id, cb.data);
+      await handleCallback(cb.message.chat.id, cb.data, cb.id);
+      return Response.json({ ok: true });
+    }
     const msg = update?.message;
     if (msg?.text && msg.chat?.id) {
       console.log("tg webhook: обрабатываю", msg.chat.id, msg.text);
