@@ -1,6 +1,8 @@
 import { computeFinance } from "@/lib/finance";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { tgSend, parsePurchase } from "@/lib/telegram";
+import { userHasPaidOrder } from "@/lib/orders";
+import { isAdminEmail } from "@/lib/admin";
 
 /**
  * Логика Telegram-бота «Деньги под контролем» — ежедневный финансовый дневник.
@@ -97,6 +99,34 @@ async function patchUser(tgId: number, patch: Partial<TgUser>) {
     .from("telegram_users")
     .update({ ...patch, updated_at: new Date().toISOString() })
     .eq("tg_id", tgId);
+}
+
+/** Есть ли у привязанного аккаунта оплата (или это админ). Без привязки — нет. */
+async function hasPaidAccessForUser(userId: string | null): Promise<boolean> {
+  if (!userId) return false;
+  const supabase = createAdminClient();
+  const { data } = await supabase.auth.admin.getUserById(userId);
+  const email = data.user?.email;
+  if (!email) return false;
+  if (isAdminEmail(email)) return true;
+  return userHasPaidOrder(email);
+}
+
+/** Сообщение-пейволл: как получить доступ в боте. */
+function paywallText(linked: boolean): string {
+  if (!linked) {
+    return (
+      `🔒 <b>Доступ к боту — после оплаты.</b>\n\n` +
+      `1. Оформите доступ на сайте: ${SITE}\n` +
+      `2. Затем откройте ${SITE}/account → «Подключить Telegram-бота» — я привяжусь к вашему аккаунту и подтяну бюджет.\n\n` +
+      `После этого пишите траты сюда — я буду вести ваш месяц.`
+    );
+  }
+  return (
+    `🔒 <b>Доступ не оплачен.</b>\n\n` +
+    `Ваш аккаунт привязан, но подписки нет. Оформите доступ: ${SITE}\n` +
+    `После оплаты всё заработает автоматически — ничего больше делать не нужно.`
+  );
 }
 
 // ── Расчёты и леджер ───────────────────────────────────────────────────
@@ -318,6 +348,13 @@ async function linkAccount(u: TgUser, code: string) {
   await supabase.from("tg_link_codes").delete().eq("code", code);
 
   const fresh = await getUser(u.tg_id);
+
+  // Проверяем оплату привязанного аккаунта
+  if (!(await hasPaidAccessForUser(userId))) {
+    await tgSend(u.tg_id, `✅ Аккаунт привязан!\n\n${paywallText(true)}`, { keyboard: KB.keyboard });
+    return;
+  }
+
   if (fresh.income > 0) {
     await tgSend(
       u.tg_id,
@@ -370,8 +407,7 @@ export async function handleMessage(chatId: number, rawText: string) {
       chatId,
       `👋 Привет! Я твой денежный дневник.\n\n` +
         `Каждый день пиши, сколько потратил — просто пришли сумму (<i>кофе 300</i>). Я веду месяц и говорю, сколько ещё можно тратить и сколько осталось копить.\n\n` +
-        `1. Привяжи аккаунт с сайта (${SITE}/account) — подтяну бюджет и цель.\n` +
-        `2. Или настрой бюджет здесь — /setup\n\n` +
+        `Доступ — для оформивших на сайте. Открой ${SITE}/account → «Подключить Telegram-бота», и я привяжусь к твоему аккаунту и подтяну бюджет.\n\n` +
         `Кнопки внизу: 📊 Остаток · 🎯 Цель · 🛒 Можно купить?`,
       { keyboard: KB.keyboard },
     );
@@ -393,6 +429,12 @@ export async function handleMessage(chatId: number, rawText: string) {
         `Полная версия (категории, история, графики): ${SITE}?utm_source=tg`,
       { keyboard: KB.keyboard },
     );
+    return;
+  }
+
+  // ── Пейволл: всё ниже — только для оплативших (привязанный аккаунт с оплатой) ──
+  if (!(await hasPaidAccessForUser(u.user_id))) {
+    await tgSend(chatId, paywallText(Boolean(u.user_id)), { keyboard: KB.keyboard });
     return;
   }
 
@@ -796,6 +838,8 @@ export async function sendDailyReminders(force = false): Promise<{ sent: number;
 
   let sent = 0;
   for (const u of users) {
+    // напоминания — только оплатившим
+    if (!(await hasPaidAccessForUser(u.user_id))) continue;
     const free = freeOf(u);
     const { expense, income } = await ledgerTotals(keyOf(u));
     const remaining = free - expense + income;
