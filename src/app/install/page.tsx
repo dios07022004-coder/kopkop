@@ -40,21 +40,24 @@ export default function InstallPage() {
             <CardContent>
               <ol className="space-y-3 text-sm">
                 <li className="flex items-start gap-3">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary">1</span>
-                  <span className="flex items-center gap-1.5">
-                    Откройте сайт в <b>Safari</b> и нажмите <Share className="inline h-4 w-4" /> «Поделиться» внизу.
+                  <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary">1</span>
+                  <span className="leading-relaxed">
+                    Откройте сайт в <b>Safari</b> и нажмите кнопку «Поделиться»{" "}
+                    <Share className="inline h-4 w-4 align-text-bottom" /> внизу экрана.
                   </span>
                 </li>
                 <li className="flex items-start gap-3">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary">2</span>
-                  <span className="flex items-center gap-1.5">
-                    Выберите <b>«На экран „Домой“»</b> <Plus className="inline h-4 w-4" />.
+                  <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary">2</span>
+                  <span className="leading-relaxed">
+                    Пролистайте вниз и выберите <b>«На экран „Домой“»</b>{" "}
+                    <Plus className="inline h-4 w-4 align-text-bottom" />.
                   </span>
                 </li>
                 <li className="flex items-start gap-3">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary">3</span>
-                  <span className="flex items-center gap-1.5">
-                    Нажмите <b>«Добавить»</b> — иконка появится на экране <Check className="inline h-4 w-4 text-[hsl(var(--success))]" />.
+                  <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary">3</span>
+                  <span className="leading-relaxed">
+                    Нажмите <b>«Добавить»</b> — иконка появится на главном экране{" "}
+                    <Check className="inline h-4 w-4 align-text-bottom text-[hsl(var(--success))]" />.
                   </span>
                 </li>
               </ol>
@@ -70,18 +73,21 @@ export default function InstallPage() {
             <CardContent>
               <ol className="space-y-3 text-sm">
                 <li className="flex items-start gap-3">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary">1</span>
-                  <span className="flex items-center gap-1.5">
-                    Меню браузера <MoreVertical className="inline h-4 w-4" /> (три точки справа сверху).
+                  <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary">1</span>
+                  <span className="leading-relaxed">
+                    Откройте меню браузера <MoreVertical className="inline h-4 w-4 align-text-bottom" /> (три точки
+                    справа сверху).
                   </span>
                 </li>
                 <li className="flex items-start gap-3">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary">2</span>
-                  <span><b>«Установить приложение»</b> или «Добавить на главный экран».</span>
+                  <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary">2</span>
+                  <span className="leading-relaxed">
+                    Выберите <b>«Установить приложение»</b> или «Добавить на главный экран».
+                  </span>
                 </li>
                 <li className="flex items-start gap-3">
-                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary">3</span>
-                  <span>Готово — откроется как обычное приложение.</span>
+                  <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary">3</span>
+                  <span className="leading-relaxed">Готово — откроется как обычное приложение.</span>
                 </li>
               </ol>
             </CardContent>
