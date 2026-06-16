@@ -11,6 +11,7 @@ import {
   type SourcePoint,
 } from "@/components/admin/admin-charts";
 import { UtmBuilder } from "@/components/admin/utm-builder";
+import { AdminUsers, type AdminUserRow } from "@/components/admin/admin-users";
 import type { Order } from "@/types";
 
 export const metadata = buildPageMetadata({
@@ -116,15 +117,17 @@ export default async function AdminPage() {
   const utmRows = buildUtmRows(orders);
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://kapkapmoney.ru";
 
-  let users: { email: string; created: string; lastSignIn: string | null }[] = [];
+  const paidEmails = new Set(paid.map((o) => o.email.toLowerCase()));
+  let users: AdminUserRow[] = [];
   if (isSupabaseAdminConfigured()) {
     try {
       const supabase = createAdminClient();
-      const { data } = await supabase.auth.admin.listUsers({ page: 1, perPage: 200 });
+      const { data } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
       users = (data?.users ?? []).map((u) => ({
         email: u.email ?? "—",
         created: u.created_at,
         lastSignIn: u.last_sign_in_at ?? null,
+        paid: paidEmails.has((u.email ?? "").toLowerCase()),
       }));
     } catch {
       users = [];
@@ -258,38 +261,10 @@ export default async function AdminPage() {
         </div>
       </section>
 
-      {/* Пользователи */}
+      {/* Пользователи и доступ */}
       <section className="mt-10">
-        <h2 className="mb-3 text-lg font-semibold">Пользователи</h2>
-        <div className="soft-card overflow-x-auto">
-          <table className="w-full min-w-[560px] text-sm">
-            <thead className="border-b border-border/60 text-left text-muted-foreground">
-              <tr>
-                <th className="px-4 py-3 font-medium">Email</th>
-                <th className="px-4 py-3 font-medium">Регистрация</th>
-                <th className="px-4 py-3 font-medium">Последний вход</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.length === 0 && (
-                <tr>
-                  <td colSpan={3} className="px-4 py-6 text-center text-muted-foreground">
-                    {isSupabaseAdminConfigured()
-                      ? "Пользователей пока нет"
-                      : "Supabase не настроен — список недоступен"}
-                  </td>
-                </tr>
-              )}
-              {users.map((u) => (
-                <tr key={u.email} className="border-b border-border/40 last:border-0">
-                  <td className="px-4 py-3">{u.email}</td>
-                  <td className="px-4 py-3 whitespace-nowrap">{fmtDate(u.created)}</td>
-                  <td className="px-4 py-3 whitespace-nowrap">{fmtDate(u.lastSignIn)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <h2 className="mb-3 text-lg font-semibold">Пользователи и доступ</h2>
+        <AdminUsers users={users} />
       </section>
     </div>
   );
