@@ -117,19 +117,27 @@ export function MonthLedger({ initial }: { initial?: Summary }) {
 
   // Карточку показываем только если есть бюджет (иначе нечего считать)
   if (loaded && (!summary || !summary.hasBudget)) {
+    const onAppPage = typeof window !== "undefined" && window.location.pathname.startsWith("/app");
     return (
       <Card className="soft-card mt-4">
         <CardHeader>
           <CardTitle>Этот месяц</CardTitle>
           <CardDescription>
-            Сохраните расчёт в калькуляторе — и здесь появится живая картина месяца: сколько можно
-            тратить, сколько осталось, плюс разовые доходы и траты.
+            {onAppPage
+              ? "Заполните цифры выше и нажмите «Сохранить расчёт» — здесь появится живая картина месяца: сколько можно тратить, сколько осталось, плюс разовые доходы и траты."
+              : "Сохраните расчёт в калькуляторе — и здесь появится живая картина месяца: сколько можно тратить, сколько осталось, плюс разовые доходы и траты."}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Button asChild>
-            <a href="/app">Открыть калькулятор</a>
-          </Button>
+          {onAppPage ? (
+            <Button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>
+              Заполнить цифры выше
+            </Button>
+          ) : (
+            <Button asChild>
+              <a href="/app">Открыть калькулятор</a>
+            </Button>
+          )}
         </CardContent>
       </Card>
     );

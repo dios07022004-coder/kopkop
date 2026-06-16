@@ -53,7 +53,7 @@ export function InstallBanner() {
       await deferred.userChoice;
       dismiss();
     } else {
-      window.location.href = "/account";
+      window.location.href = "/install";
     }
   };
 
