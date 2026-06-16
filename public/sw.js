@@ -44,3 +44,41 @@ self.addEventListener("fetch", (event) => {
       .catch(async () => (await caches.match(request)) || Response.error()),
   );
 });
+
+// ── Web Push: показать уведомление ──
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { body: event.data ? event.data.text() : "" };
+  }
+  const title = data.title || "Деньги под контролем";
+  const options = {
+    body: data.body || "",
+    icon: "/app-icon",
+    badge: "/app-icon",
+    data: { url: data.url || "/app" },
+    tag: data.tag || "dpc-reminder",
+    renotify: true,
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// ── Клик по уведомлению: открыть/сфокусировать приложение ──
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = (event.notification.data && event.notification.data.url) || "/app";
+  event.waitUntil(
+    (async () => {
+      const all = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+      for (const client of all) {
+        if ("focus" in client) {
+          client.navigate(target).catch(() => {});
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(target);
+    })(),
+  );
+});

@@ -3,6 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { tgSend, tgAnswerCallback, parsePurchase } from "@/lib/telegram";
 import { userHasPaidOrder } from "@/lib/orders";
 import { isAdminEmail } from "@/lib/admin";
+import { sendPushToUser, isPushConfigured } from "@/lib/push";
 
 /**
  * Логика Telegram-бота «Деньги под контролем» — ежедневный финансовый дневник.
@@ -1054,6 +1055,51 @@ export async function sendDailyReminders(force = false): Promise<{ sent: number;
     await tgSend(u.tg_id, lines.join("\n"), { keyboard: KB.keyboard });
     await patchUser(u.tg_id, { last_remind_on: today });
     sent++;
+  }
+  return { sent, skipped: "" };
+}
+
+/**
+ * Утренние web-push напоминания (МСК 9–11, раз в день на пользователя).
+ * Шлём оплатившим, у кого включены пуши в приложении.
+ */
+export async function sendPushReminders(force = false): Promise<{ sent: number; skipped: string }> {
+  if (!isPushConfigured()) return { sent: 0, skipped: "push не настроен (нет VAPID)" };
+  const hour = mskHour();
+  if (!force && (hour < 9 || hour > 11)) {
+    return { sent: 0, skipped: `не время (МСК ${hour}:00)` };
+  }
+  const supabase = createAdminClient();
+  const today = mskToday();
+  const { data } = await supabase
+    .from("push_subscriptions")
+    .select("user_id,last_push_on");
+  // уникальные пользователи, кому сегодня ещё не слали
+  const userIds = Array.from(
+    new Set(
+      ((data ?? []) as { user_id: string; last_push_on: string | null }[])
+        .filter((r) => force || r.last_push_on !== today)
+        .map((r) => r.user_id),
+    ),
+  );
+
+  let sent = 0;
+  for (const userId of userIds) {
+    if (!(await hasPaidAccessForUser(userId))) continue;
+    const s = await getMonthSummaryByUser(userId);
+    if (!s.hasBudget) continue;
+    const horizon = s.cycleMode
+      ? `до зарплаты ${s.nextPayday ? fmtDate(s.nextPayday) : ""}`
+      : "на месяц";
+    const body =
+      s.remaining < 0
+        ? `Перерасход ${fmt(-s.remaining)}. Сегодня лучше не тратить.`
+        : `Осталось ${horizon}: ${fmt(s.remaining)} ≈ ${fmt(s.perDay)}/день. Запиши траты за сегодня.`;
+    const n = await sendPushToUser(userId, { title: "Деньги под контролем", body, url: "/app", tag: "daily" });
+    if (n > 0) {
+      sent += n;
+      await supabase.from("push_subscriptions").update({ last_push_on: today }).eq("user_id", userId);
+    }
   }
   return { sent, skipped: "" };
 }

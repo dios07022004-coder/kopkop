@@ -1,6 +1,6 @@
 import { isSupabaseAdminConfigured } from "@/lib/supabase/admin";
 import { isTelegramConfigured } from "@/lib/telegram";
-import { sendDailyReminders } from "@/lib/telegram-bot";
+import { sendDailyReminders, sendPushReminders } from "@/lib/telegram-bot";
 
 /**
  * Триггер ежедневных напоминаний. Дёргается поллером (scripts/bot-poll.mjs)
@@ -15,17 +15,21 @@ export async function POST(request: Request) {
   if (process.env.TELEGRAM_WEBHOOK_SECRET && secret !== process.env.TELEGRAM_WEBHOOK_SECRET) {
     return new Response("forbidden", { status: 403 });
   }
-  if (!isTelegramConfigured() || !isSupabaseAdminConfigured()) {
+  if (!isSupabaseAdminConfigured()) {
     return Response.json({ ok: false, reason: "not configured" });
   }
 
   const force = new URL(request.url).searchParams.get("force") === "1";
   try {
-    const res = await sendDailyReminders(force);
-    if (res.sent > 0 || force) console.log("tg cron: отправлено напоминаний", res.sent, res.skipped);
-    return Response.json({ ok: true, ...res });
+    // Telegram-сводка (если бот настроен) + web-push в приложении — независимо
+    const tg = isTelegramConfigured() ? await sendDailyReminders(force) : { sent: 0, skipped: "tg off" };
+    const push = await sendPushReminders(force);
+    if (tg.sent > 0 || push.sent > 0 || force) {
+      console.log("cron: tg", tg.sent, tg.skipped, "| push", push.sent, push.skipped);
+    }
+    return Response.json({ ok: true, tg, push });
   } catch (e) {
-    console.error("tg cron: ошибка →", (e as Error).message);
+    console.error("cron: ошибка →", (e as Error).message);
     return Response.json({ ok: false, error: (e as Error).message });
   }
 }

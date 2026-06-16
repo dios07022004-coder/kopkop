@@ -111,6 +111,19 @@ create index if not exists tg_expenses_user_idx on public.tg_expenses (user_id, 
 alter table public.tg_expenses enable row level security;
 -- доступ только с service_role (бэкенд бота / API сайта)
 
+-- Подписки на web-push (уведомления приложения). Доступ только с service_role.
+create table if not exists public.push_subscriptions (
+  id bigint generated always as identity primary key,
+  user_id uuid not null references auth.users (id) on delete cascade,
+  endpoint text not null unique,
+  p256dh text not null,
+  auth text not null,
+  last_push_on date,
+  created_at timestamptz not null default now()
+);
+create index if not exists push_subs_user_idx on public.push_subscriptions (user_id);
+alter table public.push_subscriptions enable row level security;
+
 -- Одноразовые коды привязки Telegram к аккаунту сайта
 create table if not exists public.tg_link_codes (
   code text primary key,
