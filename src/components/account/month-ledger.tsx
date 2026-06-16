@@ -19,7 +19,12 @@ type Summary = {
   daysLeft: number;
   goalName: string | null;
   goalRemaining: number;
+  cycleMode: boolean;
+  nextPayday: string | null;
+  base: number;
 };
+
+const fmtDate = (ymd: string) => `${ymd.slice(8, 10)}.${ymd.slice(5, 7)}`;
 
 type Entry = {
   id: number;
@@ -133,12 +138,19 @@ export function MonthLedger({ initial }: { initial?: Summary }) {
   const s = summary;
   const over = s ? s.remaining < 0 : false;
 
+  const cycle = s?.cycleMode ?? false;
+  const title = cycle ? "До зарплаты" : "Этот месяц";
+  const firstLabel = cycle ? "Доступно" : "Свободно";
+  const firstValue = cycle ? s?.base ?? 0 : s?.free ?? 0;
+
   return (
     <Card className="soft-card mt-4">
       <CardHeader>
-        <CardTitle>Этот месяц</CardTitle>
+        <CardTitle>{title}</CardTitle>
         <CardDescription>
-          Свободно за месяц минус траты плюс разовые доходы. То же видно в Telegram-боте.
+          {cycle
+            ? `Деньги на счёте до зарплаты ${s?.nextPayday ? fmtDate(s.nextPayday) : ""} минус траты плюс разовые доходы. То же видно в Telegram-боте.`
+            : "Свободно за месяц минус траты плюс разовые доходы. То же видно в Telegram-боте."}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -146,8 +158,8 @@ export function MonthLedger({ initial }: { initial?: Summary }) {
           <div className="rounded-xl border border-border/60 bg-muted/40 p-4">
             <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
               <div>
-                <p className="text-muted-foreground">Свободно</p>
-                <p className="text-base font-semibold">{fmt(s.free)}</p>
+                <p className="text-muted-foreground">{firstLabel}</p>
+                <p className="text-base font-semibold">{fmt(firstValue)}</p>
               </div>
               <div>
                 <p className="text-muted-foreground">Потрачено</p>
@@ -166,8 +178,8 @@ export function MonthLedger({ initial }: { initial?: Summary }) {
             </div>
             <p className="mt-2 text-xs text-muted-foreground">
               {over
-                ? `Перерасход. До конца месяца лучше не тратить (${s.daysLeft} дн.).`
-                : `≈ ${fmt(s.perDay)}/день на ${s.daysLeft} дн.`}
+                ? `Перерасход. ${cycle ? "До зарплаты" : "До конца месяца"} лучше не тратить (${s.daysLeft} дн.).`
+                : `≈ ${fmt(s.perDay)}/день на ${s.daysLeft} дн.${cycle && s.nextPayday ? ` (до зарплаты ${fmtDate(s.nextPayday)})` : ""}`}
               {s.goalName && s.goalRemaining > 0 && ` · 🎯 до «${s.goalName}»: ${fmt(s.goalRemaining)}`}
             </p>
           </div>

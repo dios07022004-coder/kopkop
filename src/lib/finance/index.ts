@@ -26,6 +26,7 @@ export * from "./explain";
 export * from "./plan-view";
 export * from "./improvement-hints";
 export * from "./verify-calculation";
+export * from "./pay-cycle";
 
 export function computeFinance(
   rawBudget: Partial<BudgetInput>,

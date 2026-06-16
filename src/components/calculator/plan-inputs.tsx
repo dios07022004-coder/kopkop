@@ -77,6 +77,15 @@ export function PlanInputs({ budget, onBudgetChange }: PlanInputsProps) {
       value: budget.minimumBalance,
       onChange: (v: number) => onBudgetChange({ ...budget, minimumBalance: v }),
     },
+    {
+      key: "payday",
+      label: CALCULATOR_INPUTS.payday.label,
+      tooltip: CALCULATOR_INPUTS.payday.tooltip,
+      placeholder: CALCULATOR_INPUTS.payday.placeholder,
+      value: budget.payday ?? 0,
+      onChange: (v: number) =>
+        onBudgetChange({ ...budget, payday: v >= 1 && v <= 31 ? Math.round(v) : undefined }),
+    },
   ] as const;
 
   return (

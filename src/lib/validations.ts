@@ -22,6 +22,7 @@ export const budgetInputSchema = z.object({
   minimumBalance: z.coerce.number().min(0),
   reserveTarget: z.coerce.number().min(0).optional(),
   categories: z.array(budgetCategorySchema).optional(),
+  payday: z.coerce.number().min(0).max(31).optional(),
 });
 
 export const purchaseInputSchema = z.object({

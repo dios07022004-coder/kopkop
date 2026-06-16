@@ -81,6 +81,10 @@ alter table public.telegram_users add column if not exists goal_saved integer no
 alter table public.telegram_users add column if not exists synced_at timestamptz;
 alter table public.telegram_users add column if not exists remind_daily boolean not null default true;
 alter table public.telegram_users add column if not exists last_remind_on date;
+-- Учёт даты зарплаты (cash-flow по циклам)
+alter table public.telegram_users add column if not exists current_balance integer not null default 0;
+alter table public.telegram_users add column if not exists min_balance integer not null default 0;
+alter table public.telegram_users add column if not exists payday integer not null default 0;
 
 alter table public.telegram_users enable row level security;
 -- политик нет → доступ только с service_role (бэкенд бота)

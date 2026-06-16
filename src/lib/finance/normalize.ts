@@ -55,6 +55,10 @@ export function normalizeBudgetInput(raw: Partial<BudgetInput>): BudgetInput {
       ? toNonNegativeNumber(raw.reserveTarget)
       : undefined,
     categories,
+    payday:
+      raw.payday !== undefined && raw.payday !== null
+        ? Math.min(31, Math.max(0, Math.round(toNonNegativeNumber(raw.payday))))
+        : undefined,
   };
 }
 

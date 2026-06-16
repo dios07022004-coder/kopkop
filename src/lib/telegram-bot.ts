@@ -1,4 +1,4 @@
-import { computeFinance } from "@/lib/finance";
+import { computeFinance, cycleBounds, hasPayday } from "@/lib/finance";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { tgSend, tgAnswerCallback, parsePurchase } from "@/lib/telegram";
 import { userHasPaidOrder } from "@/lib/orders";
@@ -68,6 +68,9 @@ export type TgUser = {
   synced_at: string | null;
   remind_daily: boolean;
   last_remind_on: string | null;
+  current_balance: number;
+  min_balance: number;
+  payday: number; // 0 = выключено (календарный месяц)
 };
 
 const EMPTY = (tgId: number): TgUser => ({
@@ -83,6 +86,9 @@ const EMPTY = (tgId: number): TgUser => ({
   synced_at: null,
   remind_daily: true,
   last_remind_on: null,
+  current_balance: 0,
+  min_balance: 0,
+  payday: 0,
 });
 
 async function getUser(tgId: number): Promise<TgUser> {
@@ -153,10 +159,23 @@ function keyOf(u: TgUser): LedgerKey {
   return u.user_id ? { userId: u.user_id } : { tgId: u.tg_id };
 }
 
-/** Σ трат и Σ разовых доходов за текущий месяц. */
-async function ledgerTotals(key: LedgerKey): Promise<{ expense: number; income: number }> {
+/**
+ * Период расчёта. Если задан день зарплаты — цикл [последняя ЗП … следующая ЗП),
+ * иначе — календарный месяц. fromDay используется для агрегации леджера.
+ */
+type Period = { cycleMode: boolean; fromDay: string; daysLeft: number; nextPayday: string | null };
+function periodOf(payday: number): Period {
+  if (hasPayday(payday)) {
+    const b = cycleBounds(payday, mskNow());
+    return { cycleMode: true, fromDay: b.start, daysLeft: b.daysLeft, nextPayday: b.end };
+  }
+  return { cycleMode: false, fromDay: mskMonthStart(), daysLeft: mskDaysLeftInMonth(), nextPayday: null };
+}
+
+/** Σ трат и Σ разовых доходов за период (с fromDay включительно). */
+async function ledgerTotals(key: LedgerKey, fromDay: string): Promise<{ expense: number; income: number }> {
   const supabase = createAdminClient();
-  const base = supabase.from("tg_expenses").select("amount,kind").gte("day", mskMonthStart());
+  const base = supabase.from("tg_expenses").select("amount,kind").gte("day", fromDay);
   const { data } = await (key.userId ? base.eq("user_id", key.userId) : base.eq("tg_id", key.tgId as number));
   let expense = 0;
   let income = 0;
@@ -225,35 +244,64 @@ function goalLine(u: TgUser): string | null {
   return `🎯 ${name}: ${fmt(u.goal_saved)} из ${fmt(u.goal_target)} (${pct}%) · осталось ${fmt(remaining)}${eta}`;
 }
 
-async function statusText(u: TgUser): Promise<string> {
-  const free = freeOf(u);
-  const { expense, income } = await ledgerTotals(keyOf(u));
-  const remaining = free - expense + income;
-  const daysLeft = mskDaysLeftInMonth();
-  const perDay = remaining > 0 ? Math.round(remaining / daysLeft) : 0;
-  const today = await dayExpense(keyOf(u), mskToday());
+const fmtDate = (ymd: string) => `${ymd.slice(8, 10)}.${ymd.slice(5, 7)}`;
 
-  let head: string;
-  if (remaining < 0) {
-    head = `🔴 Перерасход ${fmt(-remaining)} сверх свободных ${fmt(free)} за месяц.`;
-  } else if (remaining < free * 0.15) {
-    head = `🟡 Осталось ${fmt(remaining)} на ${daysLeft} ${pluralDays(daysLeft)} — ужмись.`;
-  } else {
-    head = `🟢 Можно тратить ещё ${fmt(remaining)} до конца месяца.`;
+/** Единый расчёт остатка: цикл до зарплаты (если задан payday) или календарный месяц. */
+async function computeStatus(u: TgUser) {
+  const period = periodOf(u.payday);
+  const { expense, income } = await ledgerTotals(keyOf(u), period.fromDay);
+  const free = freeOf(u); // месячный якорь (доход − обязательные − откладываю)
+  // база периода: в режиме цикла — деньги, доступные до зарплаты (счёт − подушка)
+  const base = period.cycleMode ? Math.max(0, u.current_balance - u.min_balance) : free;
+  const remaining = base - expense + income;
+  const perDay = remaining > 0 ? Math.round(remaining / period.daysLeft) : 0;
+  return { period, expense, income, free, base, remaining, perDay };
+}
+
+async function statusText(u: TgUser): Promise<string> {
+  const s = await computeStatus(u);
+  const today = await dayExpense(keyOf(u), mskToday());
+  const dl = s.period.daysLeft;
+  const g = goalLine(u);
+
+  if (s.period.cycleMode) {
+    const pd = s.period.nextPayday ? fmtDate(s.period.nextPayday) : "";
+    let head: string;
+    if (s.remaining < 0) head = `🔴 До зарплаты не хватает: минус ${fmt(-s.remaining)}.`;
+    else if (s.remaining < s.base * 0.15) head = `🟡 До зарплаты осталось ${fmt(s.remaining)} — ужимайся.`;
+    else head = `🟢 До зарплаты можно тратить ещё ${fmt(s.remaining)}.`;
+    const lines = [
+      `📊 <b>До зарплаты ${pd}</b> · ${dl} ${pluralDays(dl)}`,
+      head,
+      ``,
+      `На счёте сейчас: ${fmt(u.current_balance)}` + (u.min_balance > 0 ? ` · подушка ${fmt(u.min_balance)}` : ``),
+      `Потрачено в цикле: ${fmt(s.expense)} (сегодня ${fmt(today)})`,
+    ];
+    if (s.income > 0) lines.push(`Разовый доход: +${fmt(s.income)}`);
+    lines.push(`Можно тратить: <b>${fmt(Math.max(0, s.remaining))}</b> ≈ ${fmt(s.perDay)}/день`);
+    if (g) lines.push(``, g);
+    return lines.join("\n");
   }
 
+  let head: string;
+  if (s.remaining < 0) {
+    head = `🔴 Перерасход ${fmt(-s.remaining)} сверх свободных ${fmt(s.free)} за месяц.`;
+  } else if (s.remaining < s.free * 0.15) {
+    head = `🟡 Осталось ${fmt(s.remaining)} на ${dl} ${pluralDays(dl)} — ужмись.`;
+  } else {
+    head = `🟢 Можно тратить ещё ${fmt(s.remaining)} до конца месяца.`;
+  }
   const lines = [
     `📊 <b>Этот месяц</b>`,
     head,
     ``,
-    `Свободно на месяц: ${fmt(free)}`,
-    `Потрачено: ${fmt(expense)} (сегодня ${fmt(today)})`,
+    `Свободно на месяц: ${fmt(s.free)}`,
+    `Потрачено: ${fmt(s.expense)} (сегодня ${fmt(today)})`,
   ];
-  if (income > 0) lines.push(`Разовый доход: +${fmt(income)}`);
+  if (s.income > 0) lines.push(`Разовый доход: +${fmt(s.income)}`);
   lines.push(
-    `Осталось: <b>${fmt(Math.max(0, remaining))}</b> ≈ ${fmt(perDay)}/день · ${daysLeft} ${pluralDays(daysLeft)}`,
+    `Осталось: <b>${fmt(Math.max(0, s.remaining))}</b> ≈ ${fmt(s.perDay)}/день · ${dl} ${pluralDays(dl)}`,
   );
-  const g = goalLine(u);
   if (g) lines.push(``, g);
   return lines.join("\n");
 }
@@ -300,7 +348,14 @@ function staleBudgetNote(u: TgUser): string | null {
 
 // ── Привязка аккаунта + синхронизация бюджета и цели ───────────────────
 type Payload = {
-  budget?: { incomeMonthly?: number; mandatoryMonthly?: number; savingsMonthly?: number };
+  budget?: {
+    incomeMonthly?: number;
+    mandatoryMonthly?: number;
+    savingsMonthly?: number;
+    currentBalance?: number;
+    minimumBalance?: number;
+    payday?: number;
+  };
   savingsGoal?: { goalName?: string; targetAmount?: number; currentSaved?: number };
 };
 
@@ -340,6 +395,9 @@ function patchFromPayload(p: Payload | null): Partial<TgUser> {
     goal_name: g?.goalName || null,
     goal_target: Math.round(g?.targetAmount ?? 0),
     goal_saved: Math.round(g?.currentSaved ?? 0),
+    current_balance: Math.round(b?.currentBalance ?? 0),
+    min_balance: Math.round(b?.minimumBalance ?? 0),
+    payday: Math.round(b?.payday ?? 0),
     synced_at: new Date().toISOString(),
   };
 }
@@ -739,17 +797,13 @@ async function recordEntry(chatId: number, text: string, kind: LedgerKind) {
   const note = parsed.label && parsed.label !== "покупка" ? parsed.label : null;
   await logEntry(u, parsed.amount, note, kind);
 
-  const free = freeOf(u);
-  const { expense, income } = await ledgerTotals(keyOf(u));
-  const remaining = free - expense + income;
-  const daysLeft = mskDaysLeftInMonth();
-  const perDay = remaining > 0 ? Math.round(remaining / daysLeft) : 0;
-
+  const s = await computeStatus(u);
   const noteLabel = note ? ` (${note})` : "";
+  const horizon = s.period.cycleMode ? "до зарплаты" : "на месяц";
   const tail =
-    remaining < 0
-      ? `🔴 Перерасход ${fmt(-remaining)}. До конца месяца лучше не тратить.`
-      : `Осталось на месяц: <b>${fmt(remaining)}</b> ≈ ${fmt(perDay)}/день.`;
+    s.remaining < 0
+      ? `🔴 Перерасход ${fmt(-s.remaining)}. Лучше притормозить.`
+      : `Осталось ${horizon}: <b>${fmt(s.remaining)}</b> ≈ ${fmt(s.perDay)}/день.`;
   const head =
     kind === "income"
       ? `💵 Записал разовый доход +${fmt(parsed.amount)}${noteLabel}.`
@@ -765,13 +819,19 @@ export type MonthSummary = {
   linked: boolean;
   income: number; // месячный доход
   free: number; // свободно на месяц (доход − обязательные − откладываю)
-  spentMonth: number; // Σ трат за месяц
-  extraIncome: number; // Σ разовых доходов за месяц
-  remaining: number; // free − spent + extraIncome
+  spentMonth: number; // Σ трат за период
+  extraIncome: number; // Σ разовых доходов за период
+  remaining: number; // base − spent + extraIncome
   perDay: number;
   daysLeft: number;
   goalName: string | null;
   goalRemaining: number;
+  /** режим «до зарплаты» (задан день зарплаты) */
+  cycleMode: boolean;
+  /** дата следующей зарплаты YYYY-MM-DD (в режиме цикла) */
+  nextPayday: string | null;
+  /** база периода: в цикле — доступно до зарплаты (счёт − подушка), иначе — free */
+  base: number;
 };
 
 export type LedgerEntry = {
@@ -783,8 +843,7 @@ export type LedgerEntry = {
   source: string;
 };
 
-/** Бюджет/цель аккаунта: из telegram_users (если привязан) или из последнего расчёта. */
-async function accountBudget(userId: string): Promise<{
+type AccountBudget = {
   tgId: number | null;
   income: number;
   mandatory: number;
@@ -792,7 +851,13 @@ async function accountBudget(userId: string): Promise<{
   goalName: string | null;
   goalTarget: number;
   goalSaved: number;
-}> {
+  currentBalance: number;
+  minBalance: number;
+  payday: number;
+};
+
+/** Бюджет/цель аккаунта: из telegram_users (если привязан) или из последнего расчёта. */
+async function accountBudget(userId: string): Promise<AccountBudget> {
   const supabase = createAdminClient();
   const { data } = await supabase
     .from("telegram_users")
@@ -800,7 +865,7 @@ async function accountBudget(userId: string): Promise<{
     .eq("user_id", userId)
     .maybeSingle();
   if (data && (data as TgUser).income > 0) {
-    const u = data as TgUser;
+    const u = { ...EMPTY((data as TgUser).tg_id), ...(data as Partial<TgUser>) };
     return {
       tgId: u.tg_id,
       income: u.income,
@@ -809,6 +874,9 @@ async function accountBudget(userId: string): Promise<{
       goalName: u.goal_name,
       goalTarget: u.goal_target,
       goalSaved: u.goal_saved,
+      currentBalance: u.current_balance,
+      minBalance: u.min_balance,
+      payday: u.payday,
     };
   }
   // нет привязки/бюджета в боте — берём из последнего сохранённого расчёта
@@ -823,16 +891,20 @@ async function accountBudget(userId: string): Promise<{
     goalName: g?.goalName || null,
     goalTarget: Math.round(g?.targetAmount ?? 0),
     goalSaved: Math.round(g?.currentSaved ?? 0),
+    currentBalance: Math.round(b?.currentBalance ?? 0),
+    minBalance: Math.round(b?.minimumBalance ?? 0),
+    payday: Math.round(b?.payday ?? 0),
   };
 }
 
-/** Полная сводка месяца для аккаунта (используют /account, калькулятор, API). */
+/** Полная сводка периода для аккаунта (используют /account, калькулятор, API). */
 export async function getMonthSummaryByUser(userId: string): Promise<MonthSummary> {
   const b = await accountBudget(userId);
   const free = freeFromBudget(b.income, b.mandatory, b.savings);
-  const { expense, income } = await ledgerTotals({ userId });
-  const remaining = free - expense + income;
-  const daysLeft = mskDaysLeftInMonth();
+  const period = periodOf(b.payday);
+  const { expense, income } = await ledgerTotals({ userId }, period.fromDay);
+  const base = period.cycleMode ? Math.max(0, b.currentBalance - b.minBalance) : free;
+  const remaining = base - expense + income;
   return {
     hasBudget: b.income > 0,
     linked: b.tgId != null,
@@ -841,21 +913,26 @@ export async function getMonthSummaryByUser(userId: string): Promise<MonthSummar
     spentMonth: expense,
     extraIncome: income,
     remaining,
-    perDay: remaining > 0 ? Math.round(remaining / daysLeft) : 0,
-    daysLeft,
+    perDay: remaining > 0 ? Math.round(remaining / period.daysLeft) : 0,
+    daysLeft: period.daysLeft,
     goalName: b.goalName,
     goalRemaining: Math.max(0, b.goalTarget - b.goalSaved),
+    cycleMode: period.cycleMode,
+    nextPayday: period.nextPayday,
+    base,
   };
 }
 
-/** Записи леджера аккаунта за текущий месяц (новые сверху). */
+/** Записи леджера аккаунта за текущий период (новые сверху). */
 export async function getMonthEntries(userId: string): Promise<LedgerEntry[]> {
+  const b = await accountBudget(userId);
+  const period = periodOf(b.payday);
   const supabase = createAdminClient();
   const { data } = await supabase
     .from("tg_expenses")
     .select("id,kind,amount,note,day,source")
     .eq("user_id", userId)
-    .gte("day", mskMonthStart())
+    .gte("day", period.fromDay)
     .order("id", { ascending: false })
     .limit(100);
   return (data ?? []) as LedgerEntry[];
@@ -888,10 +965,11 @@ export async function addAdjustment(
       kind === "income"
         ? `💵 На сайте записан разовый доход +${fmt(Math.abs(amount))}${noteLabel}.`
         : `✍️ На сайте записана трата ${fmt(Math.abs(amount))}${noteLabel}.`;
+    const horizon = summary.cycleMode ? "до зарплаты" : "на месяц";
     const tail =
       summary.remaining < 0
-        ? `🔴 Перерасход ${fmt(-summary.remaining)} за месяц.`
-        : `Осталось на месяц: <b>${fmt(summary.remaining)}</b> ≈ ${fmt(summary.perDay)}/день.`;
+        ? `🔴 Перерасход ${fmt(-summary.remaining)}.`
+        : `Осталось ${horizon}: <b>${fmt(summary.remaining)}</b> ≈ ${fmt(summary.perDay)}/день.`;
     await tgSend(b.tgId, `${head}\n${tail}`, { keyboard: KB.keyboard });
   }
   return summary;
@@ -952,19 +1030,20 @@ export async function sendDailyReminders(force = false): Promise<{ sent: number;
   for (const u of users) {
     // напоминания — только оплатившим
     if (!(await hasPaidAccessForUser(u.user_id))) continue;
-    const free = freeOf(u);
-    const { expense, income } = await ledgerTotals(keyOf(u));
-    const remaining = free - expense + income;
-    const daysLeft = mskDaysLeftInMonth();
-    const perDay = remaining > 0 ? Math.round(remaining / daysLeft) : 0;
+    const s = await computeStatus(u);
+    const dl = s.period.daysLeft;
+    const perDay = s.perDay;
     const yest = await dayExpense(keyOf(u), mskYesterday());
+    const horizon = s.period.cycleMode
+      ? `до зарплаты ${s.period.nextPayday ? fmtDate(s.period.nextPayday) : ""}`
+      : "на месяц";
 
     const lines = [
       `☀️ <b>Доброе утро!</b>`,
       yest > 0 ? `Вчера потратил: ${fmt(yest)}` : `Вчера трат не записал.`,
-      remaining < 0
-        ? `🔴 В этом месяце перерасход ${fmt(-remaining)}.`
-        : `Осталось на месяц: <b>${fmt(remaining)}</b> ≈ ${fmt(perDay)}/день (${daysLeft} ${pluralDays(daysLeft)}).`,
+      s.remaining < 0
+        ? `🔴 Перерасход ${fmt(-s.remaining)}.`
+        : `Осталось ${horizon}: <b>${fmt(s.remaining)}</b> ≈ ${fmt(perDay)}/день (${dl} ${pluralDays(dl)}).`,
     ];
     const g = goalLine(u);
     if (g) lines.push(g);

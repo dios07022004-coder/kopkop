@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import { AnalyticsScripts } from "@/components/analytics/analytics-scripts";
 import { PwaRegister } from "@/components/pwa-register";
+import { InstallBanner } from "@/components/install-banner";
 import { UtmCapture } from "@/components/utm-capture";
 import { Header, Footer } from "@/components/layout/header-footer";
 import { DEFAULT_METADATA } from "@/lib/seo/metadata";
@@ -34,6 +35,7 @@ export default function RootLayout({
         <Footer />
         <AnalyticsScripts />
         <PwaRegister />
+        <InstallBanner />
         <UtmCapture />
       </body>
     </html>

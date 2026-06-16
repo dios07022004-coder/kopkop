@@ -28,6 +28,8 @@ export interface BudgetInput {
   minimumBalance: number;
   reserveTarget?: number;
   categories?: BudgetCategory[];
+  /** День зарплаты (1–31). 0/undefined — считаем по календарному месяцу. */
+  payday?: number;
 }
 
 export interface BudgetCore {
