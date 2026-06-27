@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isYandexConfigured, yandexAuthorizeUrl } from "@/lib/yandex";
+import { isYandexConfigured, yandexAuthorizeUrl, signYandexState } from "@/lib/yandex";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -10,18 +10,9 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${origin}/login?error=yandex_off`);
   }
 
-  const state = crypto.randomUUID();
+  // state подписан HMAC и не зависит от cookie — работает во всех браузерах,
+  // включая in-app webview и приватные режимы (cookie там часто режутся).
+  const state = signYandexState(next);
   const redirectUri = `${origin}/api/auth/yandex/callback`;
-  const res = NextResponse.redirect(yandexAuthorizeUrl(redirectUri, state));
-
-  const cookieOpts = {
-    httpOnly: true,
-    secure: true,
-    sameSite: "lax" as const,
-    path: "/",
-    maxAge: 600,
-  };
-  res.cookies.set("yx_state", state, cookieOpts);
-  res.cookies.set("yx_next", next, cookieOpts);
-  return res;
+  return NextResponse.redirect(yandexAuthorizeUrl(redirectUri, state));
 }

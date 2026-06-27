@@ -11,13 +11,42 @@ import { formatRub, cn } from "@/lib/utils";
 
 type FieldKey = "incomeMonthly" | "currentBalance" | "mandatoryMonthly" | "minimumBalance";
 
-type Step = { key: FieldKey; title: string; hint: string; placeholder: string; optional?: boolean };
+type Step = { key: FieldKey; title: string; hint: string; why: string; examples?: string; placeholder: string; optional?: boolean };
 
 const STEPS: Step[] = [
-  { key: "incomeMonthly", title: "Сколько получу в этом месяце?", hint: "Зарплата и подработки — одной суммой.", placeholder: "100 000" },
-  { key: "currentBalance", title: "Сколько сейчас на карте и счёте?", hint: "Деньги, которые уже у вас есть. Так расчёт «в день» будет точным.", placeholder: "45 000" },
-  { key: "mandatoryMonthly", title: "Обязательные траты в месяц", hint: "Аренда, кредиты, ЖКХ, подписки — суммой.", placeholder: "40 000" },
-  { key: "minimumBalance", title: "Подушка — что не трогаем", hint: "Неприкосновенный остаток на счёте. Можно оставить 0.", placeholder: "30 000", optional: true },
+  {
+    key: "incomeMonthly",
+    title: "Сколько получу в этом месяце?",
+    hint: "Все деньги, которые реально придут за месяц «на руки»: зарплата, аванс, премия, подработки, проценты.",
+    examples: "Например: зарплата 80 000 + подработка 20 000 = 100 000.",
+    why: "От дохода считается всё остальное — это ваша отправная точка.",
+    placeholder: "100 000",
+  },
+  {
+    key: "currentBalance",
+    title: "Сколько сейчас на счетах и наличными?",
+    hint: "Сложите всё, что есть прямо сейчас: карты, накопительные счета, наличные. Кредитные/заёмные деньги не считаем.",
+    examples: "Например: на карте 30 000 + наличные 15 000 = 45 000.",
+    why: "Чтобы честно посчитать, сколько можно тратить в день до следующей зарплаты.",
+    placeholder: "45 000",
+  },
+  {
+    key: "mandatoryMonthly",
+    title: "Обязательные траты в месяц",
+    hint: "То, что платите каждый месяц и пропустить нельзя: аренда/ипотека, кредиты и рассрочки, ЖКХ, связь и интернет, садик/школа, нужные подписки.",
+    examples: "Еду, кафе и развлечения сюда НЕ вносим — это уже из свободных денег.",
+    why: "Эти платежи вычитаются в первую очередь — без них «свободные» деньги были бы обманом.",
+    placeholder: "40 000",
+  },
+  {
+    key: "minimumBalance",
+    title: "Подушка — что не трогаем",
+    hint: "Неприкосновенный запас на счёте на форс-мажор (болезнь, срочный ремонт). Обычно 1–2 суммы обязательных трат.",
+    examples: "Если запаса нет — поставьте 0, и мы подскажем, как его собрать.",
+    why: "Ниже этой суммы не опускаемся — это не деньги на жизнь, а страховка.",
+    placeholder: "30 000",
+    optional: true,
+  },
 ];
 
 const GOAL_STEP = STEPS.length; // цель накопления
@@ -109,6 +138,13 @@ export function CalculatorQuiz({
   const canBuyNow = price > 0 && gap === 0;
   const purchaseMonths = gap > 0 && purchaseMonthly > 0 ? Math.ceil(gap / purchaseMonthly) : 0;
   const goalMonths = savingsGoal.targetAmount > 0 && goalMonthly > 0 ? Math.ceil(savingsGoal.targetAmount / goalMonthly) : 0;
+  // если взносы больше свободного — считаем реальный срок по доступной доле бюджета
+  const overcommitted = totalContrib > free && free > 0;
+  const realShare = (m: number) => (totalContrib > 0 ? Math.round((free * m) / totalContrib) : 0);
+  const realGoalMonthly = realShare(goalMonthly);
+  const realGoalMonths = realGoalMonthly > 0 ? Math.ceil(savingsGoal.targetAmount / realGoalMonthly) : 0;
+  const realPurchaseMonthly = realShare(purchaseMonthly);
+  const realPurchaseMonths = realPurchaseMonthly > 0 ? Math.ceil(gap / realPurchaseMonthly) : 0;
   const recGoal = recommend(savingsGoal.targetAmount, purchaseMonthly);
   const recPurchase = recommend(gap || price, goalMonthly);
 
@@ -167,6 +203,9 @@ export function CalculatorQuiz({
             {STEPS[step].optional && <span className="ml-2 align-middle text-sm font-normal text-muted-foreground">(необязательно)</span>}
           </h2>
           <p className="mt-1.5 text-sm text-muted-foreground">{STEPS[step].hint}</p>
+          {STEPS[step].examples && (
+            <p className="mt-1.5 text-sm font-medium text-foreground/80">{STEPS[step].examples}</p>
+          )}
 
           <div className="mt-5">
             {moneyInput({
@@ -177,6 +216,11 @@ export function CalculatorQuiz({
               big: true,
               onEnter: next,
             })}
+
+            <p className="mt-3 flex items-start gap-1.5 text-xs text-muted-foreground">
+              <Lightbulb className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+              {STEPS[step].why}
+            </p>
 
             {step === 0 && (
               <div className="mt-4 rounded-xl border border-border/60 bg-muted/30 p-3.5">
@@ -213,7 +257,10 @@ export function CalculatorQuiz({
             Копите на что-то конкретное?
             <span className="ml-2 align-middle text-sm font-normal text-muted-foreground">(необязательно)</span>
           </h2>
-          <p className="mt-1.5 text-sm text-muted-foreground">Цель, сколько нужно всего и сколько готовы откладывать в месяц.</p>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Большая цель или мечта: ремонт, машина, отпуск, резерв. Укажите, сколько нужно всего и сколько
+            комфортно откладывать в месяц — посчитаем срок. Не знаете взнос — нажмите «Рекомендуем».
+          </p>
           <div className="mt-5 space-y-3">
             <Input autoFocus placeholder="Например: отпуск, ремонт" value={savingsGoal.goalName || ""} onChange={(e) => setGoalName(e.target.value)} className="h-12 text-base" />
             <div>
@@ -243,7 +290,10 @@ export function CalculatorQuiz({
             Планируете крупную покупку?
             <span className="ml-2 align-middle text-sm font-normal text-muted-foreground">(необязательно)</span>
           </h2>
-          <p className="mt-1.5 text-sm text-muted-foreground">Цена и сколько готовы откладывать в месяц на неё.</p>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Конкретная покупка: телефон, техника, мебель. Введите цену — если хватает на счёте, скажем сразу;
+            если нет — сколько откладывать в месяц и за какой срок накопите.
+          </p>
           <div className="mt-5 space-y-3">
             <div>
               <p className="mb-1 text-xs text-muted-foreground">Цена покупки</p>
@@ -298,6 +348,13 @@ export function CalculatorQuiz({
                 {goalMonthly > 0
                   ? ` Откладывая ${formatRub(goalMonthly)}/мес — за ${goalMonths} ${pluralMonths(goalMonths)}.`
                   : " Укажите взнос/мес, чтобы посчитать срок."}
+                {overcommitted && goalMonthly > 0 && realGoalMonths > 0 && (
+                  <span className="text-muted-foreground">
+                    {" "}
+                    Но это больше свободного — реально ≈ {formatRub(realGoalMonthly)}/мес → за {realGoalMonths}{" "}
+                    {pluralMonths(realGoalMonths)}.
+                  </span>
+                )}
               </p>
             </div>
           )}
@@ -312,6 +369,12 @@ export function CalculatorQuiz({
                   : purchaseMonthly > 0
                     ? `🟡 Не хватает ${formatRub(gap)} (на счёте доступно ${formatRub(cashNow)}). Откладывая ${formatRub(purchaseMonthly)}/мес — за ${purchaseMonths} ${pluralMonths(purchaseMonths)}.`
                     : `🟡 Не хватает ${formatRub(gap)} (на счёте доступно ${formatRub(cashNow)}). Укажите взнос/мес — посчитаю срок.`}
+                {overcommitted && !canBuyNow && purchaseMonthly > 0 && realPurchaseMonths > 0 && (
+                  <span className="block text-muted-foreground">
+                    Это больше свободного — реально ≈ {formatRub(realPurchaseMonthly)}/мес → за {realPurchaseMonths}{" "}
+                    {pluralMonths(realPurchaseMonths)}.
+                  </span>
+                )}
               </p>
             </div>
           )}

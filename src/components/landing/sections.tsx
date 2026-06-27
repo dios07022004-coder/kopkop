@@ -88,7 +88,7 @@ export function HeroSection() {
               className="h-12 w-full max-w-sm rounded-xl text-base shadow-md transition-transform hover:scale-[1.02] sm:w-auto sm:px-10"
               asChild
             >
-              <Link href="/app">
+              <Link href="#demo">
                 {HERO.ctaCalculator}
                 <ArrowRight className="ml-1 h-4 w-4" />
               </Link>
@@ -110,8 +110,8 @@ export function HeroSection() {
           </p>
         </div>
 
-        {/* Живое мини-демо — считаем прямо здесь */}
-        <div className="animate-float-in mx-auto mt-10 max-w-3xl" style={{ animationDelay: "400ms" }}>
+        {/* Живое мини-демо — считаем прямо здесь (бесплатно, без подписки) */}
+        <div id="demo" className="animate-float-in mx-auto mt-10 max-w-3xl scroll-mt-20" style={{ animationDelay: "400ms" }}>
           <HomeDemo />
         </div>
       </div>
@@ -549,7 +549,7 @@ export function CtaSection() {
             className="h-12 rounded-xl px-6 text-white hover:bg-white/10 hover:text-white"
             asChild
           >
-            <Link href="/app">Сначала посчитать бесплатно</Link>
+            <Link href="/#demo">Сначала посчитать бесплатно</Link>
           </Button>
         </div>
         <p className="mt-4 text-sm text-emerald-50/80">{FINAL_CTA.note}</p>

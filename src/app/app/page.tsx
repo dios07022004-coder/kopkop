@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { CalculatorApp } from "@/components/calculator/calculator-app";
 import { Button } from "@/components/ui/button";
 import { CALCULATOR_PAGE } from "@/data/calculator-copy";
@@ -13,6 +14,8 @@ export const metadata = buildPageMetadata({
 
 export default async function AppPage() {
   const paid = await hasPaidAccess();
+  // Полный калькулятор — по подписке. Бесплатный расчёт — мини-демо на главной (#demo).
+  if (!paid) redirect("/checkout");
 
   return (
     <div className="page-container py-8 sm:py-12">

@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { createAdminClient, isSupabaseAdminConfigured } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { yandexExchangeCode, yandexGetUser } from "@/lib/yandex";
+import { yandexExchangeCode, yandexGetUser, verifyYandexState } from "@/lib/yandex";
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -10,17 +9,16 @@ export async function GET(request: Request) {
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
 
-  const cookieStore = await cookies();
-  const savedState = cookieStore.get("yx_state")?.value;
-  const next = cookieStore.get("yx_next")?.value ?? "/app";
-
   const fail = (reason: string, detail?: unknown) => {
     console.error("yandex callback fail:", reason, detail ?? "");
     return NextResponse.redirect(`${origin}/login?error=${reason}`);
   };
 
-  if (!code || !state || !savedState || state !== savedState) {
-    return fail("yandex_state", { code: !!code, state, savedState });
+  // Проверяем подписанный state (без cookie). Работает во всех браузерах.
+  const verified = verifyYandexState(state);
+  const next = verified?.next ?? "/app";
+  if (!code || !verified) {
+    return fail("yandex_state", { code: !!code, hasState: !!state });
   }
   if (!isSupabaseAdminConfigured()) {
     return fail("supabase_off");
