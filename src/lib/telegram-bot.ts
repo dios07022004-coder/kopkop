@@ -377,8 +377,30 @@ type Payload = {
   purchase?: { price?: number };
 };
 
+/** Явно выбранный активный шаблон аккаунта (или null). */
+async function activeCalcId(userId: string): Promise<string | null> {
+  const supabase = createAdminClient();
+  const { data } = await supabase
+    .from("account_settings")
+    .select("active_calc_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+  return (data as { active_calc_id: string | null } | null)?.active_calc_id ?? null;
+}
+
+/** Payload активного шаблона (если выбран и существует), иначе — последнего сохранённого. */
 async function latestPayload(userId: string): Promise<Payload | null> {
   const supabase = createAdminClient();
+  const activeId = await activeCalcId(userId);
+  if (activeId) {
+    const { data } = await supabase
+      .from("calculations")
+      .select("payload")
+      .eq("id", activeId)
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (data) return (data as { payload?: Payload }).payload ?? null;
+  }
   const { data } = await supabase
     .from("calculations")
     .select("payload")
@@ -994,20 +1016,24 @@ export async function getMonthSummaryByUser(userId: string): Promise<MonthSummar
 
 export type TemplateItem = { id: string; label: string | null; free: number | null; active: boolean };
 
-/** Сохранённые шаблоны аккаунта (для выбора на сайте). active = самый свежий (используется в расчёте). */
+/** Шаблоны аккаунта (стабильный порядок). active = явно выбранный (или последний, если не выбран). */
 export async function listAccountTemplates(userId: string): Promise<TemplateItem[]> {
   const supabase = createAdminClient();
-  const { data } = await supabase
-    .from("calculations")
-    .select("id,label,free")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(12);
+  const [{ data }, activeId] = await Promise.all([
+    supabase
+      .from("calculations")
+      .select("id,label,free")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(12),
+    activeCalcId(userId),
+  ]);
   const rows = (data ?? []) as { id: string; label: string | null; free: number | null }[];
-  return rows.map((r, i) => ({ ...r, active: i === 0 }));
+  const effectiveActive = activeId && rows.some((r) => r.id === activeId) ? activeId : rows[0]?.id;
+  return rows.map((r) => ({ ...r, active: r.id === effectiveActive }));
 }
 
-/** Сделать шаблон активным: поднимаем его дату → он становится текущим бюджетом. */
+/** Сделать шаблон активным: явно сохраняем выбор (порядок списка не меняется). */
 export async function activateTemplate(userId: string, id: string): Promise<MonthSummary> {
   const supabase = createAdminClient();
   const { data: row } = await supabase
@@ -1017,7 +1043,10 @@ export async function activateTemplate(userId: string, id: string): Promise<Mont
     .eq("user_id", userId)
     .maybeSingle();
   if (!row) throw new Error("Шаблон не найден");
-  await supabase.from("calculations").update({ created_at: new Date().toISOString() }).eq("id", id).eq("user_id", userId);
+  const { error } = await supabase
+    .from("account_settings")
+    .upsert({ user_id: userId, active_calc_id: id }, { onConflict: "user_id" });
+  if (error) throw new Error(error.message);
   await pushBudgetToBot(userId).catch(() => {}); // синхрон с ботом, если привязан
   return getMonthSummaryByUser(userId);
 }

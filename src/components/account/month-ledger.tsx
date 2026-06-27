@@ -88,7 +88,10 @@ export function MonthLedger({ initial }: { initial?: Summary }) {
     }
   };
 
+  const [activating, setActivating] = useState<string | null>(null);
   const activate = async (id: string) => {
+    setActivating(id);
+    setError(null);
     try {
       const res = await fetch("/api/templates/activate", {
         method: "POST",
@@ -100,9 +103,13 @@ export function MonthLedger({ initial }: { initial?: Summary }) {
         setSummary(data.summary);
         setEntries(data.entries ?? []);
         setTemplates(data.templates ?? []);
+      } else {
+        setError(data.error ?? "Не удалось переключить шаблон");
       }
     } catch {
-      /* ignore */
+      setError("Сеть недоступна");
+    } finally {
+      setActivating(null);
     }
   };
 
@@ -211,18 +218,19 @@ export function MonthLedger({ initial }: { initial?: Summary }) {
               <button
                 key={t.id}
                 type="button"
+                disabled={activating === t.id}
                 onClick={() => !t.active && activate(t.id)}
                 className={cn(
-                  "shrink-0 rounded-xl border px-3 py-2 text-left text-xs transition-colors",
+                  "shrink-0 rounded-xl border px-3 py-2 text-left text-xs transition-colors disabled:opacity-60",
                   t.active
-                    ? "border-primary bg-primary/10 text-foreground"
-                    : "border-border/60 text-muted-foreground hover:text-foreground",
+                    ? "border-primary bg-primary/15 text-foreground shadow-[0_0_0_1px_hsl(var(--primary))]"
+                    : "border-border/60 text-muted-foreground hover:border-primary/50 hover:text-foreground",
                 )}
               >
                 <span className="block font-medium">{t.label || "Расчёт"}</span>
                 <span className="block text-[11px] text-muted-foreground">
-                  {t.active ? "активный · " : ""}
-                  {fmt(t.free ?? 0)} своб.
+                  {activating === t.id ? "переключаем…" : t.active ? "активный · " : ""}
+                  {activating === t.id ? "" : `${fmt(t.free ?? 0)} своб.`}
                 </span>
               </button>
             ))}

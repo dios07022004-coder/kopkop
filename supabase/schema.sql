@@ -111,6 +111,14 @@ create index if not exists tg_expenses_user_idx on public.tg_expenses (user_id, 
 alter table public.tg_expenses enable row level security;
 -- доступ только с service_role (бэкенд бота / API сайта)
 
+-- Настройки аккаунта: какой шаблон (расчёт) сейчас активен. Доступ только с service_role.
+create table if not exists public.account_settings (
+  user_id uuid primary key references auth.users (id) on delete cascade,
+  active_calc_id uuid references public.calculations (id) on delete set null,
+  updated_at timestamptz not null default now()
+);
+alter table public.account_settings enable row level security;
+
 -- Подписки на web-push (уведомления приложения). Доступ только с service_role.
 create table if not exists public.push_subscriptions (
   id bigint generated always as identity primary key,
