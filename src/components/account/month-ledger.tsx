@@ -100,9 +100,12 @@ function Stat({ label, value, tone }: { label: string; value: string; tone?: "su
   );
 }
 
+type Template = { id: string; label: string | null; free: number | null; active: boolean };
+
 export function MonthLedger({ initial }: { initial?: Summary }) {
   const [summary, setSummary] = useState<Summary | null>(initial ?? null);
   const [entries, setEntries] = useState<Entry[]>([]);
+  const [templates, setTemplates] = useState<Template[]>([]);
   const [kind, setKind] = useState<"expense" | "income">("expense");
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
@@ -120,10 +123,29 @@ export function MonthLedger({ initial }: { initial?: Summary }) {
       const data = await res.json();
       setSummary(data.summary);
       setEntries(data.entries ?? []);
+      setTemplates(data.templates ?? []);
     } catch {
       /* ignore */
     } finally {
       setLoaded(true);
+    }
+  };
+
+  const activate = async (id: string) => {
+    try {
+      const res = await fetch("/api/templates/activate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSummary(data.summary);
+        setEntries(data.entries ?? []);
+        setTemplates(data.templates ?? []);
+      }
+    } catch {
+      /* ignore */
     }
   };
 
@@ -225,6 +247,31 @@ export function MonthLedger({ initial }: { initial?: Summary }) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
+        {/* Шаблоны: выбрать активный (сверху) */}
+        {templates.length > 1 && (
+          <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+            {templates.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => !t.active && activate(t.id)}
+                className={cn(
+                  "shrink-0 rounded-xl border px-3 py-2 text-left text-xs transition-colors",
+                  t.active
+                    ? "border-primary bg-primary/10 text-foreground"
+                    : "border-border/60 text-muted-foreground hover:text-foreground",
+                )}
+              >
+                <span className="block font-medium">{t.label || "Расчёт"}</span>
+                <span className="block text-[11px] text-muted-foreground">
+                  {t.active ? "активный · " : ""}
+                  {fmt(t.free ?? 0)} своб.
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+
         {s && (
           <div className="rounded-2xl border border-border/60 bg-gradient-to-b from-primary/[0.06] to-transparent p-5">
             {/* Кольцо-индикатор: сколько ещё можно тратить */}
@@ -264,6 +311,27 @@ export function MonthLedger({ initial }: { initial?: Summary }) {
                 🎯 До цели «{s.goalName}» осталось накопить <b>{fmt(s.goalRemaining)}</b>
               </p>
             )}
+
+            {/* Подключите напоминания */}
+            <div className="mt-4 rounded-xl border border-primary/30 bg-primary/5 p-3 text-center">
+              <p className="text-xs font-medium text-foreground">
+                🔔 Получайте напоминания, сколько можно потратить
+              </p>
+              <div className="mt-2 flex justify-center gap-2">
+                <a
+                  href="/account#telegram"
+                  className="rounded-lg border border-border/60 bg-background px-3 py-1.5 text-xs font-medium hover:text-primary"
+                >
+                  В Telegram
+                </a>
+                <a
+                  href="/install"
+                  className="rounded-lg border border-border/60 bg-background px-3 py-1.5 text-xs font-medium hover:text-primary"
+                >
+                  Скачать приложение
+                </a>
+              </div>
+            </div>
           </div>
         )}
 

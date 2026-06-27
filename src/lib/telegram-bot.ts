@@ -924,6 +924,36 @@ export async function getMonthSummaryByUser(userId: string): Promise<MonthSummar
   };
 }
 
+export type TemplateItem = { id: string; label: string | null; free: number | null; active: boolean };
+
+/** Сохранённые шаблоны аккаунта (для выбора на сайте). active = самый свежий (используется в расчёте). */
+export async function listAccountTemplates(userId: string): Promise<TemplateItem[]> {
+  const supabase = createAdminClient();
+  const { data } = await supabase
+    .from("calculations")
+    .select("id,label,free")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false })
+    .limit(12);
+  const rows = (data ?? []) as { id: string; label: string | null; free: number | null }[];
+  return rows.map((r, i) => ({ ...r, active: i === 0 }));
+}
+
+/** Сделать шаблон активным: поднимаем его дату → он становится текущим бюджетом. */
+export async function activateTemplate(userId: string, id: string): Promise<MonthSummary> {
+  const supabase = createAdminClient();
+  const { data: row } = await supabase
+    .from("calculations")
+    .select("id")
+    .eq("id", id)
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!row) throw new Error("Шаблон не найден");
+  await supabase.from("calculations").update({ created_at: new Date().toISOString() }).eq("id", id).eq("user_id", userId);
+  await pushBudgetToBot(userId).catch(() => {}); // синхрон с ботом, если привязан
+  return getMonthSummaryByUser(userId);
+}
+
 /** Записи леджера аккаунта за текущий период (новые сверху). */
 export async function getMonthEntries(userId: string): Promise<LedgerEntry[]> {
   const b = await accountBudget(userId);
