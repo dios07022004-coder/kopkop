@@ -45,7 +45,7 @@ export default async function AccountPage() {
 
   return (
     <div className="page-container py-6 sm:py-10">
-      <div className="mx-auto max-w-lg">
+      <div className="mx-auto max-w-2xl">
         <div className="flex items-center justify-between gap-3 animate-float-in">
           <div className="min-w-0">
             <h1 className="text-xl font-bold sm:text-2xl">Кабинет</h1>

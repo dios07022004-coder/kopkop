@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
-import { ArrowLeft, ArrowRight, Wallet, Sparkles, PiggyBank, ShoppingCart } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, ArrowRight, Wallet, Sparkles, PiggyBank, ShoppingCart, Save } from "lucide-react";
 import type { BudgetInput, FinanceResult, PurchaseInput } from "@/lib/finance";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -78,6 +78,7 @@ export function CalculatorQuiz({
   onPurchaseChange,
   result,
   onDone,
+  onSave,
 }: {
   budget: BudgetInput;
   purchase: PurchaseInput;
@@ -85,8 +86,21 @@ export function CalculatorQuiz({
   onPurchaseChange: (next: PurchaseInput) => void;
   result: FinanceResult;
   onDone: () => void;
+  onSave: () => Promise<void>;
 }) {
+  const router = useRouter();
   const [step, setStep] = useState(0);
+  const [saving, setSaving] = useState(false);
+
+  const saveAndOpen = async () => {
+    setSaving(true);
+    try {
+      await onSave();
+    } catch {
+      /* расчёт всё равно сохранён локально — продолжаем */
+    }
+    router.push("/account");
+  };
   const isPurchase = step === PURCHASE_STEP;
   const isResult = step === RESULT_STEP;
   const isInput = step < PURCHASE_STEP;
@@ -102,10 +116,15 @@ export function CalculatorQuiz({
   const progress = Math.round((stepNo / TOTAL) * 100);
 
   // якорь и производные для подсказок результата
-  const free = result.core.remainingAfterMandatory;
   const afterSavings = result.core.freeBudgetMonthly; // доход − обязательные − откладываю
   const price = purchase.price;
-  const months = free > 0 && price > free ? Math.ceil(price / free) : 0;
+  // Покупка считается честно: можно ли купить с наличных (счёт − подушка),
+  // а копить — по реальной сумме откладывания, а не по всему бюджету «на жизнь».
+  const cashNow = Math.max(0, budget.currentBalance - budget.minimumBalance);
+  const saveRate = budget.savingsMonthly > 0 ? budget.savingsMonthly : 0;
+  const gap = Math.max(0, price - cashNow);
+  const canBuyNow = price > 0 && gap === 0;
+  const months = gap > 0 && saveRate > 0 ? Math.ceil(gap / saveRate) : 0;
 
   return (
     <div className="soft-card overflow-hidden p-5 sm:p-7">
@@ -229,21 +248,21 @@ export function CalculatorQuiz({
             </div>
           )}
 
-          {/* Покупка */}
+          {/* Покупка — честный расчёт: наличные сейчас + реальная сумма откладывания */}
           {price > 0 && (
             <div
               className={cn(
                 "flex items-start gap-3 rounded-xl border p-4 text-sm",
-                free <= 0 ? "surface-danger" : price <= free ? "surface-success" : "surface-warning",
+                canBuyNow ? "surface-success" : "surface-warning",
               )}
             >
               <ShoppingCart className="mt-0.5 h-5 w-5 shrink-0" />
               <p>
-                {free <= 0
-                  ? `Покупка ${formatRub(price)}: свободных денег нет — сначала сократите обязательные.`
-                  : price <= free
-                    ? `🟢 Покупку ${formatRub(price)} можно позволить в этом месяце — останется ${formatRub(free - price)} на жизнь.`
-                    : `🟡 Покупка ${formatRub(price)} дороже свободных ${formatRub(free)}. Откладывая по ${formatRub(free)}/мес — накопите за ${months} ${pluralMonths(months)}.`}
+                {canBuyNow
+                  ? `🟢 Покупку ${formatRub(price)} можно позволить сейчас — хватает на счёте, подушка ${formatRub(budget.minimumBalance)} остаётся. После покупки на счёте будет ${formatRub(cashNow - price)}.`
+                  : saveRate > 0
+                    ? `🟡 Не хватает ${formatRub(gap)} (на счёте доступно ${formatRub(cashNow)}). Откладывая по ${formatRub(saveRate)}/мес — накопите за ${months} ${pluralMonths(months)}.`
+                    : `🟡 Не хватает ${formatRub(gap)} (на счёте доступно ${formatRub(cashNow)}). Укажите на шаге «откладывать в месяц», сколько можете копить — посчитаю срок.`}
               </p>
             </div>
           )}
@@ -257,13 +276,17 @@ export function CalculatorQuiz({
               в личном кабинете. Записывайте траты — цифры пересчитываются сами.
             </p>
             <div className="mt-4 flex flex-col justify-center gap-2 sm:flex-row">
-              <Button asChild className="rounded-xl">
-                <Link href="/account">Открыть кабинет</Link>
+              <Button onClick={saveAndOpen} disabled={saving} size="lg" className="rounded-xl px-7">
+                <Save className="mr-2 h-4 w-4" />
+                {saving ? "Сохраняем…" : "Сохранить и открыть кабинет"}
               </Button>
-              <Button variant="outline" onClick={onDone} className="rounded-xl">
-                Показать детали расчёта
+              <Button variant="outline" size="lg" onClick={onDone} className="rounded-xl">
+                Показать детали
               </Button>
             </div>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Расчёт сохранится как шаблон — в кабинете увидите аналитику по нему и сможете вести траты.
+            </p>
           </div>
 
           <button

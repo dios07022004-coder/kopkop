@@ -75,16 +75,20 @@ export function AnalyticsRing({
     return () => clearTimeout(t);
   }, []);
 
-  const size = 260;
-  const sw = 26;
-  const r = (size - sw) / 2 - 6;
+  const size = 320;
+  const sw = 30;
+  const r = (size - sw) / 2 - 8;
   const c = 2 * Math.PI * r;
   const cx = size / 2;
   const cy = size / 2;
+  const r2 = r - sw - 6; // «эхо»-дуги для слоистого вида (как в референсе)
+  const sw2 = 9;
+  const c2 = 2 * Math.PI * r2;
 
   const segs = categories.filter((s) => s.amount > 0);
   const total = segs.reduce((s, x) => s + x.amount, 0) || 1;
   let offset = 0;
+  let offset2 = 0;
 
   const centerValueRaw = mode === "day" ? perDay : Math.max(0, remaining);
   const centerValue = useCountUp(centerValueRaw);
@@ -97,15 +101,17 @@ export function AnalyticsRing({
 
   return (
     <div className="flex flex-col items-center">
-      {/* переключатель день/месяц */}
-      <div className="mb-4 inline-flex rounded-full border border-border/60 bg-muted/40 p-0.5 text-xs">
+      {/* премиальный переключатель день/месяц */}
+      <div className="mb-5 inline-flex rounded-full border border-border/60 bg-muted/50 p-1 text-sm shadow-inner">
         {(["day", "month"] as const).map((m) => (
           <button
             key={m}
             type="button"
             onClick={() => setMode(m)}
-            className={`rounded-full px-4 py-1.5 font-medium transition-colors ${
-              mode === m ? "bg-primary text-primary-foreground" : "text-muted-foreground"
+            className={`rounded-full px-5 py-2 font-semibold transition-all ${
+              mode === m
+                ? "bg-primary text-primary-foreground shadow-[0_4px_14px_hsl(var(--primary)/0.4)]"
+                : "text-muted-foreground hover:text-foreground"
             }`}
           >
             {m === "day" ? "В день" : "В месяц"}
@@ -113,37 +119,28 @@ export function AnalyticsRing({
         ))}
       </div>
 
-      <div className="relative" style={{ width: size, height: size }}>
+      <div className="relative aspect-square w-full max-w-[360px]">
         {/* живое вращающееся свечение (конусный градиент категорий) */}
         <div
-          className="animate-spin-slow absolute -inset-2 -z-10 rounded-full opacity-60 blur-2xl"
+          className="animate-spin-slow absolute -inset-3 -z-10 rounded-full opacity-70 blur-2xl"
           style={{
             background: over
-              ? "conic-gradient(from 0deg, hsl(0 75% 50% / 0.35), transparent 60%)"
-              : `conic-gradient(from 0deg, ${PALETTE.map((c, i) => `${c.replace(")", " / 0.30)")} ${(i / PALETTE.length) * 360}deg`).join(", ")})`,
+              ? "conic-gradient(from 0deg, hsl(0 75% 50% / 0.4), transparent 60%)"
+              : `conic-gradient(from 0deg, ${PALETTE.map((c, i) => `${c.replace(")", " / 0.34)")} ${(i / PALETTE.length) * 360}deg`).join(", ")})`,
           }}
         />
         <div
-          className="animate-pulse-soft absolute inset-4 -z-10 rounded-full blur-xl"
-          style={{ background: over ? "hsl(0 75% 50% / 0.15)" : "hsl(var(--primary) / 0.18)" }}
+          className="animate-pulse-soft absolute inset-6 -z-10 rounded-full blur-xl"
+          style={{ background: over ? "hsl(0 75% 50% / 0.15)" : "hsl(var(--primary) / 0.2)" }}
         />
-        <svg width={size} height={size} className="-rotate-90">
+        <svg viewBox={`0 0 ${size} ${size}`} className="h-full w-full -rotate-90">
           {/* концентрические направляющие — слоистый радиальный вид */}
-          {[r + sw / 2 + 10, r + sw / 2 + 5, r, r - sw / 2 - 5, r - sw / 2 - 10].map((rr, i) => (
-            <circle
-              key={i}
-              cx={cx}
-              cy={cy}
-              r={rr}
-              fill="none"
-              stroke="hsl(var(--border))"
-              strokeWidth={1}
-              opacity={0.35}
-            />
+          {[r + sw / 2 + 12, r + sw / 2 + 6, r, r - sw / 2 - 6, r2, r2 - sw2].map((rr, i) => (
+            <circle key={i} cx={cx} cy={cy} r={rr} fill="none" stroke="hsl(var(--border))" strokeWidth={1} opacity={0.3} />
           ))}
-          {/* фон кольца */}
+          {/* фон внешнего кольца */}
           <circle cx={cx} cy={cy} r={r} fill="none" stroke="hsl(var(--muted))" strokeWidth={sw} />
-          {/* сегменты категорий */}
+          {/* внешнее кольцо — сегменты категорий */}
           {segs.map((seg, i) => {
             const len = (seg.amount / total) * c;
             const dash = `${len} ${c - len}`;
@@ -162,11 +159,37 @@ export function AnalyticsRing({
                 style={{
                   transition: "stroke-dasharray 0.8s cubic-bezier(0.22,1,0.36,1)",
                   transitionDelay: `${i * 90}ms`,
-                  filter: `drop-shadow(0 0 6px ${PALETTE[i % PALETTE.length]}55)`,
+                  filter: `drop-shadow(0 0 7px ${PALETTE[i % PALETTE.length]}66)`,
                 }}
               />
             );
             offset += len;
+            return el;
+          })}
+          {/* внутреннее «эхо»-кольцо (слоистость как в референсе) */}
+          {segs.map((seg, i) => {
+            const len = (seg.amount / total) * c2;
+            const dash = `${len} ${c2 - len}`;
+            const el = (
+              <circle
+                key={`e-${seg.label}`}
+                cx={cx}
+                cy={cy}
+                r={r2}
+                fill="none"
+                stroke={PALETTE[i % PALETTE.length]}
+                strokeWidth={sw2}
+                strokeLinecap="butt"
+                strokeDasharray={drawn ? dash : `0 ${c2}`}
+                strokeDashoffset={-offset2}
+                opacity={0.4}
+                style={{
+                  transition: "stroke-dasharray 0.9s cubic-bezier(0.22,1,0.36,1)",
+                  transitionDelay: `${i * 90 + 120}ms`,
+                }}
+              />
+            );
+            offset2 += len;
             return el;
           })}
         </svg>
@@ -176,7 +199,7 @@ export function AnalyticsRing({
             {over ? "Перерасход" : "Можно тратить"}
           </span>
           <span
-            className={`mt-1 text-3xl font-extrabold tabular-nums ${over ? "text-[hsl(var(--danger))]" : ""}`}
+            className={`mt-1 text-3xl font-extrabold tabular-nums sm:text-4xl ${over ? "text-[hsl(var(--danger))]" : ""}`}
           >
             {over && mode === "month" ? `−${fmt(-remaining)}` : fmt(centerValue)}
           </span>

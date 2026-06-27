@@ -294,30 +294,30 @@ export function MonthLedger({ initial }: { initial?: Summary }) {
 
         {/* Добавить разовую сумму */}
         <div className="space-y-2">
-          <div className="flex gap-2">
+          <div className="flex gap-2.5">
             <button
               type="button"
               onClick={() => setKind("expense")}
               className={cn(
-                "flex flex-1 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                "flex flex-1 items-center justify-center gap-2 rounded-xl border-2 px-3 py-3 text-base font-semibold transition-all active:scale-[0.98]",
                 kind === "expense"
-                  ? "border-[hsl(var(--danger))] bg-[hsl(var(--danger))]/10 text-[hsl(var(--danger))]"
+                  ? "border-[hsl(var(--danger))] bg-[hsl(var(--danger))]/15 text-[hsl(var(--danger))] shadow-[0_4px_16px_hsl(var(--danger)/0.25)]"
                   : "border-border/60 text-muted-foreground hover:text-foreground",
               )}
             >
-              <Minus className="h-4 w-4" /> Трата
+              <Minus className="h-5 w-5" /> Трата
             </button>
             <button
               type="button"
               onClick={() => setKind("income")}
               className={cn(
-                "flex flex-1 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
+                "flex flex-1 items-center justify-center gap-2 rounded-xl border-2 px-3 py-3 text-base font-semibold transition-all active:scale-[0.98]",
                 kind === "income"
-                  ? "border-[hsl(var(--success))] bg-[hsl(var(--success))]/10 text-[hsl(var(--success))]"
+                  ? "border-[hsl(var(--success))] bg-[hsl(var(--success))]/15 text-[hsl(var(--success))] shadow-[0_4px_16px_hsl(var(--success)/0.25)]"
                   : "border-border/60 text-muted-foreground hover:text-foreground",
               )}
             >
-              <Plus className="h-4 w-4" /> Доход
+              <Plus className="h-5 w-5" /> Доход
             </button>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">

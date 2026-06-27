@@ -155,6 +155,14 @@ export function CalculatorApp({ paid = false }: { paid?: boolean }) {
           onPurchaseChange={(next) => setPurchase(parsePurchaseInput(next))}
           result={fullResult}
           onDone={() => setQuizDone(true)}
+          onSave={async () => {
+            await history.save({
+              free: fullResult.core.remainingAfterMandatory,
+              budget,
+              purchase,
+              savingsGoal,
+            });
+          }}
         />
       ) : (
         <>
