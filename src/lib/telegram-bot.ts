@@ -1051,6 +1051,22 @@ export async function activateTemplate(userId: string, id: string): Promise<Mont
   return getMonthSummaryByUser(userId);
 }
 
+/** Удалить шаблон (расчёт) аккаунта. */
+export async function deleteTemplate(userId: string, id: string): Promise<void> {
+  const supabase = createAdminClient();
+  await supabase.from("calculations").delete().eq("id", id).eq("user_id", userId);
+}
+
+/** Переименовать шаблон. */
+export async function renameTemplate(userId: string, id: string, label: string): Promise<void> {
+  const supabase = createAdminClient();
+  await supabase
+    .from("calculations")
+    .update({ label: label.trim().slice(0, 40) || "Расчёт" })
+    .eq("id", id)
+    .eq("user_id", userId);
+}
+
 /** Записи леджера аккаунта за текущий период (новые сверху). */
 export async function getMonthEntries(userId: string): Promise<LedgerEntry[]> {
   const b = await accountBudget(userId);

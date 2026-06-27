@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ArrowRight, Wallet, Sparkles, PiggyBank, ShoppingCart, Save } from "lucide-react";
-import type { BudgetInput, FinanceResult, PurchaseInput } from "@/lib/finance";
+import { ArrowLeft, ArrowRight, Wallet, Sparkles, PiggyBank, ShoppingCart, Save, Target } from "lucide-react";
+import type { BudgetInput, FinanceResult, PurchaseInput, SavingsGoalInput } from "@/lib/finance";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PrimaryAnswer } from "@/components/calculator/primary-answer";
@@ -55,9 +55,10 @@ const STEPS: Step[] = [
   },
 ];
 
-const PURCHASE_STEP = STEPS.length; // шаг покупки
-const RESULT_STEP = STEPS.length + 1; // экран результата
-const TOTAL = STEPS.length + 2;
+const GOAL_STEP = STEPS.length; // шаг цели накопления
+const PURCHASE_STEP = STEPS.length + 1; // шаг покупки
+const RESULT_STEP = STEPS.length + 2; // экран результата
+const TOTAL = STEPS.length + 3;
 
 const pluralMonths = (n: number) =>
   n % 10 === 1 && n % 100 !== 11
@@ -74,16 +75,20 @@ const pluralMonths = (n: number) =>
 export function CalculatorQuiz({
   budget,
   purchase,
+  savingsGoal,
   onBudgetChange,
   onPurchaseChange,
+  onSavingsGoalChange,
   result,
   onDone,
   onSave,
 }: {
   budget: BudgetInput;
   purchase: PurchaseInput;
+  savingsGoal: SavingsGoalInput;
   onBudgetChange: (next: BudgetInput) => void;
   onPurchaseChange: (next: PurchaseInput) => void;
+  onSavingsGoalChange: (next: SavingsGoalInput) => void;
   result: FinanceResult;
   onDone: () => void;
   onSave: () => Promise<void>;
@@ -91,6 +96,8 @@ export function CalculatorQuiz({
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
+
+  const isGoal = step === GOAL_STEP;
 
   const saveAndOpen = async () => {
     setSaving(true);
@@ -109,6 +116,8 @@ export function CalculatorQuiz({
   const setPayday = (v: number) =>
     onBudgetChange({ ...budget, payday: v >= 1 && v <= 31 ? Math.round(v) : undefined });
   const setPrice = (v: number) => onPurchaseChange({ ...purchase, price: v });
+  const setGoalName = (name: string) => onSavingsGoalChange({ ...savingsGoal, goalName: name });
+  const setGoalTarget = (v: number) => onSavingsGoalChange({ ...savingsGoal, targetAmount: v });
 
   const next = () => setStep((s) => Math.min(RESULT_STEP, s + 1));
   const back = () => setStep((s) => Math.max(0, s - 1));
@@ -201,6 +210,47 @@ export function CalculatorQuiz({
         </div>
       )}
 
+      {isGoal && (
+        <div key="goal" className="animate-float-in">
+          <div className="flex items-center gap-2 text-primary">
+            <Target className="h-5 w-5" />
+            <span className="text-xs font-medium uppercase tracking-wide">Цель</span>
+          </div>
+          <h2 className="mt-2 text-xl font-bold sm:text-2xl">
+            Копите на что-то конкретное?
+            <span className="ml-2 align-middle text-sm font-normal text-muted-foreground">(необязательно)</span>
+          </h2>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Назовите цель и сколько нужно всего — покажем прогресс и срок в кабинете.
+          </p>
+          <div className="mt-5 space-y-3">
+            <Input
+              autoFocus
+              placeholder="Например: отпуск, новый телефон"
+              value={savingsGoal.goalName || ""}
+              onChange={(e) => setGoalName(e.target.value)}
+              className="h-12 text-base"
+            />
+            <div className="relative">
+              <Input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                placeholder="Сколько нужно всего, ₽"
+                value={savingsGoal.targetAmount || ""}
+                onChange={(e) => setGoalTarget(Number(e.target.value) || 0)}
+                onKeyDown={(e) => e.key === "Enter" && next()}
+                className="h-12 pr-10 text-base"
+              />
+              <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground">
+                ₽
+              </span>
+            </div>
+          </div>
+          {renderNav()}
+        </div>
+      )}
+
       {isPurchase && (
         <div key="purchase" className="animate-float-in">
           <div className="flex items-center gap-2 text-primary">
@@ -259,6 +309,20 @@ export function CalculatorQuiz({
                   <b>{formatRub(afterSavings)}/мес</b>.
                 </p>
               )}
+            </div>
+          )}
+
+          {/* Цель накопления */}
+          {savingsGoal.targetAmount > 0 && (
+            <div className="surface-success flex items-start gap-3 rounded-xl border p-4 text-sm">
+              <Target className="mt-0.5 h-5 w-5 shrink-0" />
+              <p>
+                Цель {savingsGoal.goalName ? <b>«{savingsGoal.goalName}»</b> : "накопления"}:{" "}
+                <b>{formatRub(savingsGoal.targetAmount)}</b>.
+                {budget.savingsMonthly > 0
+                  ? ` Откладывая по ${formatRub(budget.savingsMonthly)}/мес — накопите за ${Math.ceil(savingsGoal.targetAmount / budget.savingsMonthly)} ${pluralMonths(Math.ceil(savingsGoal.targetAmount / budget.savingsMonthly))}.`
+                  : " Укажите на шаге «откладывать в месяц», сколько копите — посчитаю срок."}
+              </p>
             </div>
           )}
 

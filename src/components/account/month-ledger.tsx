@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Minus, Trash2, TrendingUp, TrendingDown } from "lucide-react";
+import { Plus, Minus, Trash2, TrendingUp, TrendingDown, X, HelpCircle } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -69,6 +69,22 @@ export function MonthLedger({ initial }: { initial?: Summary }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [hint, setHint] = useState(false);
+  useEffect(() => {
+    try {
+      setHint(!localStorage.getItem("dpc-cabinet-hint"));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  const dismissHint = () => {
+    try {
+      localStorage.setItem("dpc-cabinet-hint", "1");
+    } catch {
+      /* ignore */
+    }
+    setHint(false);
+  };
 
   const load = async () => {
     try {
@@ -147,6 +163,41 @@ export function MonthLedger({ initial }: { initial?: Summary }) {
     }
   };
 
+  const delTemplate = async (id: string) => {
+    if (!window.confirm("Удалить этот шаблон?")) return;
+    try {
+      const res = await fetch("/api/templates/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setSummary(data.summary);
+        setEntries(data.entries ?? []);
+        setTemplates(data.templates ?? []);
+      } else setError(data.error ?? "Не удалось удалить");
+    } catch {
+      setError("Сеть недоступна");
+    }
+  };
+
+  const renameTemplate = async (id: string, current: string) => {
+    const label = window.prompt("Название шаблона:", current || "");
+    if (label == null || !label.trim()) return;
+    try {
+      const res = await fetch("/api/templates/rename", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, label }),
+      });
+      const data = await res.json();
+      if (res.ok) setTemplates(data.templates ?? []);
+    } catch {
+      /* ignore */
+    }
+  };
+
   const remove = async (id: number) => {
     try {
       const res = await fetch("/api/ledger/delete", {
@@ -211,29 +262,63 @@ export function MonthLedger({ initial }: { initial?: Summary }) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
-        {/* Шаблоны: выбрать активный (сверху) */}
-        {templates.length > 1 && (
+        {/* Онбординг — мини-подсказка при первом входе */}
+        {hint && s?.hasBudget && (
+          <div className="flex items-start justify-between gap-2 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
+            <span>
+              💡 Записывайте траты кнопкой <b>➖ Трата</b> ниже, переключайте <b>шаблоны</b> сверху, а <b>＋ Новый</b> — добавит расчёт.
+            </span>
+            <button type="button" aria-label="Скрыть" onClick={dismissHint} className="shrink-0 hover:text-foreground">
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
+
+        {/* Шаблоны: выбрать активный, переименовать (двойной клик), удалить (×), создать новый */}
+        {templates.length > 0 && (
           <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
             {templates.map((t) => (
-              <button
+              <div
                 key={t.id}
-                type="button"
-                disabled={activating === t.id}
-                onClick={() => !t.active && activate(t.id)}
                 className={cn(
-                  "shrink-0 rounded-xl border px-3 py-2 text-left text-xs transition-colors disabled:opacity-60",
+                  "group relative shrink-0 rounded-xl border transition-colors",
                   t.active
-                    ? "border-primary bg-primary/15 text-foreground shadow-[0_0_0_1px_hsl(var(--primary))]"
-                    : "border-border/60 text-muted-foreground hover:border-primary/50 hover:text-foreground",
+                    ? "border-primary bg-primary/15 shadow-[0_0_0_1px_hsl(var(--primary))]"
+                    : "border-border/60 hover:border-primary/50",
                 )}
               >
-                <span className="block font-medium">{t.label || "Расчёт"}</span>
-                <span className="block text-[11px] text-muted-foreground">
-                  {activating === t.id ? "переключаем…" : t.active ? "активный · " : ""}
-                  {activating === t.id ? "" : `${fmt(t.free ?? 0)} своб.`}
-                </span>
-              </button>
+                <button
+                  type="button"
+                  disabled={activating === t.id}
+                  onClick={() => !t.active && activate(t.id)}
+                  onDoubleClick={() => renameTemplate(t.id, t.label ?? "")}
+                  title="Двойной клик — переименовать"
+                  className={cn(
+                    "block px-3 py-2 pr-7 text-left text-xs disabled:opacity-60",
+                    t.active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  <span className="block font-medium">{t.label || "Расчёт"}</span>
+                  <span className="block text-[11px] text-muted-foreground">
+                    {activating === t.id ? "переключаем…" : `${t.active ? "активный · " : ""}${fmt(t.free ?? 0)} своб.`}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  aria-label="Удалить шаблон"
+                  onClick={() => delTemplate(t.id)}
+                  className="absolute right-1 top-1 rounded-md p-1 text-muted-foreground/60 hover:text-[hsl(var(--danger))]"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </div>
             ))}
+            <a
+              href="/app"
+              className="flex shrink-0 items-center gap-1 rounded-xl border border-dashed border-border/60 px-3 text-xs font-medium text-muted-foreground hover:border-primary/50 hover:text-primary"
+            >
+              <Plus className="h-4 w-4" /> Новый
+            </a>
           </div>
         )}
 
@@ -264,6 +349,19 @@ export function MonthLedger({ initial }: { initial?: Summary }) {
                 <p className="mt-0.5 text-lg font-bold tabular-nums">{fmt(s.spentToday)}</p>
               </div>
             </div>
+
+            {/* Как считается «в день» */}
+            <p
+              className="mt-2 flex items-center justify-center gap-1 text-center text-[11px] text-muted-foreground"
+              title={
+                cycle
+                  ? "В режиме «до зарплаты»: (остаток на счёте − подушка − траты + доходы) ÷ дней до зарплаты."
+                  : "В режиме месяца: свободно (доход − обязательные − откладываю) ÷ дней в месяце. Укажите день зарплаты в калькуляторе для расчёта от остатка на счёте."
+              }
+            >
+              <HelpCircle className="h-3 w-3" />
+              {cycle ? "Считаем от остатка на счёте до зарплаты" : "Свободно ÷ дней в месяце"}
+            </p>
 
             {/* Чипы со сводкой */}
             <div className="mt-4 grid grid-cols-3 gap-2">

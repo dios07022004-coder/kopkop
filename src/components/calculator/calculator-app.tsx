@@ -151,8 +151,10 @@ export function CalculatorApp({ paid = false }: { paid?: boolean }) {
         <CalculatorQuiz
           budget={budget}
           purchase={purchase}
+          savingsGoal={savingsGoal}
           onBudgetChange={(next) => setBudget(parseBudgetInput(next))}
           onPurchaseChange={(next) => setPurchase(parsePurchaseInput(next))}
+          onSavingsGoalChange={(next) => setSavingsGoal(normalizeSavingsGoalInput(next))}
           result={fullResult}
           onDone={() => setQuizDone(true)}
           onSave={async () => {
