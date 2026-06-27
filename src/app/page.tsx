@@ -1,15 +1,7 @@
 import {
-  BeforeAfterSection,
   CtaSection,
-  FaqPreviewSection,
-  ForWhomScenariosSection,
   HeroSection,
-  HowItWorksSection,
-  HowPaidWorksSection,
   PricingSection,
-  StatsStrip,
-  TestimonialsSection,
-  ThreeToolsSection,
   WorkedExampleSection,
 } from "@/components/landing/sections";
 import { MobileStickyCta } from "@/components/landing/mobile-sticky-cta";
@@ -68,18 +60,21 @@ export default function HomePage() {
   return (
     <>
       <JsonLd data={homepageJsonLd} />
+
+      {/* Секция 1 — оффер + живой пример расчёта (в Hero встроен интерактивный демо-калькулятор) */}
       <HeroSection />
-      <StatsStrip />
-      <Reveal><BeforeAfterSection /></Reveal>
-      <Reveal><HowItWorksSection /></Reveal>
-      <Reveal><WorkedExampleSection /></Reveal>
-      <Reveal><ThreeToolsSection /></Reveal>
-      <Reveal><HowPaidWorksSection /></Reveal>
-      <Reveal><TestimonialsSection /></Reveal>
-      <Reveal><PricingSection /></Reveal>
-      <Reveal><ForWhomScenariosSection /></Reveal>
-      <Reveal><FaqPreviewSection /></Reveal>
-      <Reveal><CtaSection /></Reveal>
+
+      {/* Секция 2 — как считается (детальный пример) + что получаете и цена */}
+      <Reveal>
+        <WorkedExampleSection />
+      </Reveal>
+      <Reveal>
+        <PricingSection />
+      </Reveal>
+      <Reveal>
+        <CtaSection />
+      </Reveal>
+
       <MobileStickyCta />
       <div className="h-16 sm:hidden" aria-hidden />
     </>
