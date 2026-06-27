@@ -1,9 +1,36 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 const fmt = (n: number) => `${Math.round(n).toLocaleString("ru-RU")} ₽`;
 const fmtDate = (ymd: string) => `${ymd.slice(8, 10)}.${ymd.slice(5, 7)}`;
+
+/** Плавный счётчик числа (для центра круга). */
+function useCountUp(value: number, ms = 520) {
+  const [display, setDisplay] = useState(value);
+  const fromRef = useRef(value);
+  const startRef = useRef(0);
+  useEffect(() => {
+    const from = fromRef.current;
+    const to = value;
+    if (from === to) return;
+    let raf = 0;
+    const tick = (t: number) => {
+      if (!startRef.current) startRef.current = t;
+      const p = Math.min(1, (t - startRef.current) / ms);
+      const eased = 1 - Math.pow(1 - p, 3);
+      setDisplay(Math.round(from + (to - from) * eased));
+      if (p < 1) raf = requestAnimationFrame(tick);
+      else {
+        fromRef.current = to;
+        startRef.current = 0;
+      }
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [value, ms]);
+  return display;
+}
 
 // Премиальная палитра сегментов (тёмная тема, насыщенные тона со свечением)
 const PALETTE = [
@@ -59,7 +86,8 @@ export function AnalyticsRing({
   const total = segs.reduce((s, x) => s + x.amount, 0) || 1;
   let offset = 0;
 
-  const centerValue = mode === "day" ? perDay : Math.max(0, remaining);
+  const centerValueRaw = mode === "day" ? perDay : Math.max(0, remaining);
+  const centerValue = useCountUp(centerValueRaw);
   const centerSub =
     mode === "day"
       ? `в день${cycleMode && nextPayday ? ` · до ${fmtDate(nextPayday)}` : ""}`
@@ -86,14 +114,22 @@ export function AnalyticsRing({
       </div>
 
       <div className="relative" style={{ width: size, height: size }}>
-        {/* мягкое свечение */}
+        {/* живое вращающееся свечение (конусный градиент категорий) */}
         <div
-          className="absolute inset-0 -z-10 rounded-full blur-2xl"
-          style={{ background: over ? "hsl(0 75% 50% / 0.18)" : "hsl(var(--primary) / 0.20)" }}
+          className="animate-spin-slow absolute -inset-2 -z-10 rounded-full opacity-60 blur-2xl"
+          style={{
+            background: over
+              ? "conic-gradient(from 0deg, hsl(0 75% 50% / 0.35), transparent 60%)"
+              : `conic-gradient(from 0deg, ${PALETTE.map((c, i) => `${c.replace(")", " / 0.30)")} ${(i / PALETTE.length) * 360}deg`).join(", ")})`,
+          }}
+        />
+        <div
+          className="animate-pulse-soft absolute inset-4 -z-10 rounded-full blur-xl"
+          style={{ background: over ? "hsl(0 75% 50% / 0.15)" : "hsl(var(--primary) / 0.18)" }}
         />
         <svg width={size} height={size} className="-rotate-90">
-          {/* концентрические направляющие */}
-          {[r + sw / 2 + 6, r, r - sw / 2 - 6].map((rr, i) => (
+          {/* концентрические направляющие — слоистый радиальный вид */}
+          {[r + sw / 2 + 10, r + sw / 2 + 5, r, r - sw / 2 - 5, r - sw / 2 - 10].map((rr, i) => (
             <circle
               key={i}
               cx={cx}
@@ -102,7 +138,7 @@ export function AnalyticsRing({
               fill="none"
               stroke="hsl(var(--border))"
               strokeWidth={1}
-              opacity={0.5}
+              opacity={0.35}
             />
           ))}
           {/* фон кольца */}
@@ -152,10 +188,17 @@ export function AnalyticsRing({
       {segs.length > 0 && (
         <ul className="mt-5 grid w-full grid-cols-2 gap-x-4 gap-y-2 text-sm">
           {segs.map((seg, i) => (
-            <li key={seg.label} className="flex items-center gap-2">
+            <li
+              key={seg.label}
+              className="animate-float-in flex items-center gap-2"
+              style={{ animationDelay: `${i * 70}ms` }}
+            >
               <span
                 className="h-2.5 w-2.5 shrink-0 rounded-full"
-                style={{ backgroundColor: PALETTE[i % PALETTE.length] }}
+                style={{
+                  backgroundColor: PALETTE[i % PALETTE.length],
+                  boxShadow: `0 0 8px ${PALETTE[i % PALETTE.length]}88`,
+                }}
               />
               <span className="flex-1 truncate text-muted-foreground">{seg.label}</span>
               <span className="font-semibold tabular-nums">{fmt(seg.amount)}</span>

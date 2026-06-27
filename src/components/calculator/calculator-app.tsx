@@ -35,8 +35,6 @@ import {
 } from "@/hooks/use-demo-storage";
 import { useCalcHistory } from "@/hooks/use-calc-history";
 import { downloadPlanXlsx } from "@/lib/export-xlsx";
-import { PlanInputs } from "@/components/calculator/plan-inputs";
-import { PlanPresets } from "@/components/calculator/plan-presets";
 import { CalculatorQuiz } from "@/components/calculator/calculator-quiz";
 import { GoalSectionContent } from "@/components/calculator/goal-section";
 import { PurchaseTab } from "@/components/calculator/purchase-tab";
@@ -70,11 +68,9 @@ export function CalculatorApp({ paid = false }: { paid?: boolean }) {
     purchase,
     savingsGoal,
     ui,
-    activePresetId,
     setBudget,
     setPurchase,
     setSavingsGoal,
-    applyPreset,
     applySnapshot,
   } = useDemoStorage();
 
@@ -154,26 +150,22 @@ export function CalculatorApp({ paid = false }: { paid?: boolean }) {
         /* Калькулятор-квиз: пошаговый ввод, в конце — результат + переход в кабинет */
         <CalculatorQuiz
           budget={budget}
+          purchase={purchase}
           onBudgetChange={(next) => setBudget(parseBudgetInput(next))}
+          onPurchaseChange={(next) => setPurchase(parsePurchaseInput(next))}
           result={fullResult}
           onDone={() => setQuizDone(true)}
         />
       ) : (
         <>
-      <div className="flex justify-end">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-sm text-muted-foreground">Детали расчёта</p>
         <Button type="button" variant="ghost" size="sm" onClick={() => setQuizDone(false)}>
-          ↺ Пройти заново
+          ↺ Изменить цифры
         </Button>
       </div>
 
-      {/* 1. Ввод */}
-      <PlanInputs
-        budget={budget}
-        onBudgetChange={(next) => setBudget(parseBudgetInput(next))}
-      />
-      <PlanPresets onSelect={applyPreset} activeId={activePresetId} />
-
-      {/* 2. Главный ответ — бесплатно для всех */}
+      {/* Главный ответ (ввод — в квизе, здесь без дублирования формы) */}
       <PrimaryAnswer budget={budget} result={fullResult} />
 
       {/* Воронка в Telegram — после расчёта уводим продолжать в боте */}

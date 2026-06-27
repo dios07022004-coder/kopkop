@@ -2,14 +2,15 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Wallet, Sparkles } from "lucide-react";
-import type { BudgetInput, FinanceResult } from "@/lib/finance";
+import { ArrowLeft, ArrowRight, Wallet, Sparkles, PiggyBank, ShoppingCart } from "lucide-react";
+import type { BudgetInput, FinanceResult, PurchaseInput } from "@/lib/finance";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PrimaryAnswer } from "@/components/calculator/primary-answer";
+import { formatRub } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
-type FieldKey = "incomeMonthly" | "currentBalance" | "mandatoryMonthly" | "minimumBalance";
+type FieldKey = "incomeMonthly" | "currentBalance" | "mandatoryMonthly" | "savingsMonthly" | "minimumBalance";
 
 type Step = {
   key: FieldKey;
@@ -39,6 +40,13 @@ const STEPS: Step[] = [
     placeholder: "40 000",
   },
   {
+    key: "savingsMonthly",
+    title: "Сколько откладывать каждый месяц?",
+    hint: "На накопления и цели. Эта сумма не идёт в траты. Можно 0.",
+    placeholder: "10 000",
+    optional: true,
+  },
+  {
     key: "minimumBalance",
     title: "Подушка — что не трогаем",
     hint: "Неприкосновенный остаток на счёте. Можно оставить 0.",
@@ -47,34 +55,57 @@ const STEPS: Step[] = [
   },
 ];
 
-const TOTAL = STEPS.length + 1; // + экран результата
+const PURCHASE_STEP = STEPS.length; // шаг покупки
+const RESULT_STEP = STEPS.length + 1; // экран результата
+const TOTAL = STEPS.length + 2;
+
+const pluralMonths = (n: number) =>
+  n % 10 === 1 && n % 100 !== 11
+    ? "месяц"
+    : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14)
+      ? "месяца"
+      : "месяцев";
 
 /**
- * Пошаговый калькулятор (квиз): один вопрос на экран, простая логика,
- * в конце — результат и подсказка, что всё видно в личном кабинете.
+ * Пошаговый калькулятор (квиз): доход (+день зарплаты), счёт, обязательные,
+ * накопления, подушка, планируемая покупка — авто-пересчёт. В конце — результат
+ * и переход в личный кабинет.
  */
 export function CalculatorQuiz({
   budget,
+  purchase,
   onBudgetChange,
+  onPurchaseChange,
   result,
   onDone,
 }: {
   budget: BudgetInput;
+  purchase: PurchaseInput;
   onBudgetChange: (next: BudgetInput) => void;
+  onPurchaseChange: (next: PurchaseInput) => void;
   result: FinanceResult;
   onDone: () => void;
 }) {
   const [step, setStep] = useState(0);
-  const isResult = step >= STEPS.length;
+  const isPurchase = step === PURCHASE_STEP;
+  const isResult = step === RESULT_STEP;
+  const isInput = step < PURCHASE_STEP;
 
   const setField = (key: FieldKey, value: number) => onBudgetChange({ ...budget, [key]: value });
   const setPayday = (v: number) =>
     onBudgetChange({ ...budget, payday: v >= 1 && v <= 31 ? Math.round(v) : undefined });
+  const setPrice = (v: number) => onPurchaseChange({ ...purchase, price: v });
 
-  const next = () => setStep((s) => Math.min(STEPS.length, s + 1));
+  const next = () => setStep((s) => Math.min(RESULT_STEP, s + 1));
   const back = () => setStep((s) => Math.max(0, s - 1));
+  const stepNo = Math.min(step + 1, TOTAL);
+  const progress = Math.round((stepNo / TOTAL) * 100);
 
-  const progress = Math.round(((isResult ? TOTAL : step + 1) / TOTAL) * 100);
+  // якорь и производные для подсказок результата
+  const free = result.core.remainingAfterMandatory;
+  const afterSavings = result.core.freeBudgetMonthly; // доход − обязательные − откладываю
+  const price = purchase.price;
+  const months = free > 0 && price > free ? Math.ceil(price / free) : 0;
 
   return (
     <div className="soft-card overflow-hidden p-5 sm:p-7">
@@ -87,11 +118,11 @@ export function CalculatorQuiz({
           />
         </div>
         <span className="text-xs font-medium text-muted-foreground">
-          {isResult ? "Готово" : `${step + 1} / ${STEPS.length}`}
+          {isResult ? "Готово" : `${stepNo} / ${TOTAL - 1}`}
         </span>
       </div>
 
-      {!isResult ? (
+      {isInput && (
         <div key={step} className="animate-float-in">
           <div className="flex items-center gap-2 text-primary">
             <Wallet className="h-5 w-5" />
@@ -100,9 +131,7 @@ export function CalculatorQuiz({
           <h2 className="mt-2 text-xl font-bold sm:text-2xl">
             {STEPS[step].title}
             {STEPS[step].optional && (
-              <span className="ml-2 align-middle text-sm font-normal text-muted-foreground">
-                (необязательно)
-              </span>
+              <span className="ml-2 align-middle text-sm font-normal text-muted-foreground">(необязательно)</span>
             )}
           </h2>
           <p className="mt-1.5 text-sm text-muted-foreground">{STEPS[step].hint}</p>
@@ -125,7 +154,6 @@ export function CalculatorQuiz({
               </span>
             </div>
 
-            {/* День зарплаты — на шаге дохода */}
             {step === 0 && (
               <div className="mt-4 rounded-xl border border-border/60 bg-muted/30 p-3.5">
                 <label className="text-sm font-medium">
@@ -149,20 +177,76 @@ export function CalculatorQuiz({
             )}
           </div>
 
-          <div className="mt-6 flex items-center justify-between gap-3">
-            <Button variant="ghost" onClick={back} disabled={step === 0} className={cn(step === 0 && "invisible")}>
-              <ArrowLeft className="mr-1.5 h-4 w-4" />
-              Назад
-            </Button>
-            <Button onClick={next} size="lg" className="rounded-xl px-7">
-              {step === STEPS.length - 1 ? "Посчитать" : "Далее"}
-              <ArrowRight className="ml-1.5 h-4 w-4" />
-            </Button>
-          </div>
+          {renderNav()}
         </div>
-      ) : (
+      )}
+
+      {isPurchase && (
+        <div key="purchase" className="animate-float-in">
+          <div className="flex items-center gap-2 text-primary">
+            <ShoppingCart className="h-5 w-5" />
+            <span className="text-xs font-medium uppercase tracking-wide">Покупка</span>
+          </div>
+          <h2 className="mt-2 text-xl font-bold sm:text-2xl">
+            Планируете крупную покупку?
+            <span className="ml-2 align-middle text-sm font-normal text-muted-foreground">(необязательно)</span>
+          </h2>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Введите цену — посчитаем, можно ли позволить сейчас или за сколько накопить.
+          </p>
+          <div className="mt-5 relative">
+            <Input
+              autoFocus
+              type="number"
+              inputMode="numeric"
+              min={0}
+              placeholder="например, 80 000"
+              value={purchase.price || ""}
+              onChange={(e) => setPrice(Number(e.target.value) || 0)}
+              onKeyDown={(e) => e.key === "Enter" && next()}
+              className="h-14 pr-10 text-2xl font-bold"
+            />
+            <span className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-lg text-muted-foreground">
+              ₽
+            </span>
+          </div>
+          {renderNav("Посчитать")}
+        </div>
+      )}
+
+      {isResult && (
         <div className="animate-float-in space-y-4">
           <PrimaryAnswer budget={budget} result={result} />
+
+          {/* Накопления */}
+          {budget.savingsMonthly > 0 && (
+            <div className="surface-success flex items-start gap-3 rounded-xl border p-4 text-sm">
+              <PiggyBank className="mt-0.5 h-5 w-5 shrink-0" />
+              <p>
+                Откладываете <b>{formatRub(budget.savingsMonthly)}/мес</b>. На жизнь после этого остаётся{" "}
+                <b>{formatRub(Math.max(0, afterSavings))}/мес</b>.
+              </p>
+            </div>
+          )}
+
+          {/* Покупка */}
+          {price > 0 && (
+            <div
+              className={cn(
+                "flex items-start gap-3 rounded-xl border p-4 text-sm",
+                free <= 0 ? "surface-danger" : price <= free ? "surface-success" : "surface-warning",
+              )}
+            >
+              <ShoppingCart className="mt-0.5 h-5 w-5 shrink-0" />
+              <p>
+                {free <= 0
+                  ? `Покупка ${formatRub(price)}: свободных денег нет — сначала сократите обязательные.`
+                  : price <= free
+                    ? `🟢 Покупку ${formatRub(price)} можно позволить в этом месяце — останется ${formatRub(free - price)} на жизнь.`
+                    : `🟡 Покупка ${formatRub(price)} дороже свободных ${formatRub(free)}. Откладывая по ${formatRub(free)}/мес — накопите за ${months} ${pluralMonths(months)}.`}
+              </p>
+            </div>
+          )}
 
           {/* Подсказка про кабинет */}
           <div className="cabinet-glow rounded-2xl border border-primary/30 bg-primary/5 p-5 text-center">
@@ -184,7 +268,7 @@ export function CalculatorQuiz({
 
           <button
             type="button"
-            onClick={back}
+            onClick={() => setStep(0)}
             className="mx-auto block text-sm text-muted-foreground hover:text-foreground"
           >
             ← Изменить цифры
@@ -193,4 +277,20 @@ export function CalculatorQuiz({
       )}
     </div>
   );
+
+  function renderNav(nextLabel = "Далее") {
+    const isLastInput = step === PURCHASE_STEP;
+    return (
+      <div className="mt-6 flex items-center justify-between gap-3">
+        <Button variant="ghost" onClick={back} disabled={step === 0} className={cn(step === 0 && "invisible")}>
+          <ArrowLeft className="mr-1.5 h-4 w-4" />
+          Назад
+        </Button>
+        <Button onClick={next} size="lg" className="rounded-xl px-7">
+          {isLastInput ? nextLabel : nextLabel}
+          <ArrowRight className="ml-1.5 h-4 w-4" />
+        </Button>
+      </div>
+    );
+  }
 }
