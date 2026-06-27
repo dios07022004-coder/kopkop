@@ -111,10 +111,10 @@ export function GoalSectionContent({
           className={cn(
             "rounded-xl border p-4",
             savings.status === "ok" || savings.status === "achieved"
-              ? "border-emerald-200 bg-emerald-50/60"
+              ? "surface-success"
               : savings.status === "warning"
-                ? "border-amber-200 bg-amber-50/60"
-                : "border-red-200 bg-red-50/60",
+                ? "surface-warning"
+                : "surface-danger",
           )}
         >
           <div className="flex flex-wrap items-start justify-between gap-2">
@@ -123,7 +123,7 @@ export function GoalSectionContent({
           </div>
           <Progress value={savings.progressPercent} className="mt-3 h-2" />
           {savings.reserveNote && (
-            <p className="mt-3 text-sm text-amber-900">{savings.reserveNote}</p>
+            <p className="mt-3 text-sm text-[hsl(var(--warning))]">{savings.reserveNote}</p>
           )}
         </div>
       )}

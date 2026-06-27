@@ -75,10 +75,10 @@ export function SuccessContent() {
   }
 
   return (
-    <Card className="border-emerald-200">
+    <Card className="border-[hsl(var(--success))]/30">
       <CardHeader className="text-center">
-        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100">
-          <CheckCircle2 className="h-8 w-8 text-emerald-600" />
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[hsl(var(--success))]/15">
+          <CheckCircle2 className="h-8 w-8 text-[hsl(var(--success))]" />
         </div>
         <CardTitle className="text-2xl">Оплата прошла успешно!</CardTitle>
         <CardDescription className="text-base">

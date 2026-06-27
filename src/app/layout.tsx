@@ -17,7 +17,7 @@ const inter = Inter({
 export const metadata: Metadata = DEFAULT_METADATA;
 
 export const viewport: Viewport = {
-  themeColor: "#1f9d6b",
+  themeColor: "#0c0f15",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -29,7 +29,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ru">
+    <html lang="ru" className="dark">
       <body className={`${inter.variable} font-sans antialiased`}>
         <Header />
         <main className="min-h-[calc(100vh-8rem)] pb-16 md:pb-0">{children}</main>

@@ -39,6 +39,39 @@
     --radius: 1rem;
   }
 
+  /* Премиум-тёмная тема (применяется на весь сайт через <html class="dark">) */
+  .dark {
+    --background: 224 28% 6%;
+    --foreground: 210 25% 96%;
+    --card: 224 22% 10%;
+    --card-foreground: 210 25% 96%;
+
+    --primary: 158 70% 46%;
+    --primary-foreground: 224 28% 6%;
+    --primary-dark: 158 70% 36%;
+
+    --secondary: 224 18% 15%;
+    --secondary-foreground: 210 25% 92%;
+    --muted: 224 16% 16%;
+    --muted-foreground: 215 18% 64%;
+    --accent: 224 20% 18%;
+    --accent-foreground: 158 64% 70%;
+
+    --destructive: 0 72% 56%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 158 70% 46%;
+    --success-foreground: 224 28% 6%;
+    --warning: 38 95% 58%;
+    --warning-foreground: 30 80% 10%;
+    --danger: 0 75% 62%;
+    --danger-foreground: 0 0% 100%;
+
+    --border: 222 16% 22%;
+    --input: 222 16% 24%;
+    --ring: 158 70% 46%;
+  }
+
   * {
     @apply border-border;
   }
@@ -104,6 +137,20 @@
     color: hsl(0 60% 38%);
   }
 
+  /* Тёмная тема: светлый текст на полупрозрачных подложках */
+  .dark .surface-success {
+    color: hsl(158 64% 72%);
+    background-color: hsl(var(--success) / 0.12);
+  }
+  .dark .surface-warning {
+    color: hsl(38 95% 70%);
+    background-color: hsl(var(--warning) / 0.14);
+  }
+  .dark .surface-danger {
+    color: hsl(0 85% 78%);
+    background-color: hsl(var(--danger) / 0.14);
+  }
+
   /* Paywall: blurred locked content */
   .lock-blur {
     pointer-events: none;
@@ -140,6 +187,35 @@
     .hero-aurora::before {
       animation: none;
     }
+  }
+
+  /* Тёмная тема: градиенты и тени */
+  .dark .brand-gradient {
+    background-image: radial-gradient(120% 120% at 0% 0%, hsl(158 64% 16% / 0.55) 0%, transparent 55%),
+      radial-gradient(120% 120% at 100% 0%, hsl(180 50% 16% / 0.45) 0%, transparent 50%);
+  }
+  .dark .hero-aurora::before {
+    background:
+      radial-gradient(38% 45% at 18% 8%, hsl(158 70% 32% / 0.32) 0%, transparent 60%),
+      radial-gradient(34% 40% at 90% 12%, hsl(180 70% 34% / 0.28) 0%, transparent 55%),
+      radial-gradient(40% 45% at 55% 100%, hsl(158 60% 30% / 0.28) 0%, transparent 60%);
+  }
+  .dark .hover-lift:hover {
+    box-shadow: 0 14px 36px -10px rgba(0, 0, 0, 0.6);
+  }
+
+  /* Премиальное радиальное свечение для кабинета */
+  .cabinet-glow {
+    position: relative;
+    isolation: isolate;
+  }
+  .cabinet-glow::before {
+    content: "";
+    position: absolute;
+    inset: -10% -20% 40%;
+    z-index: -1;
+    background: radial-gradient(60% 50% at 50% 0%, hsl(var(--primary) / 0.18) 0%, transparent 70%);
+    pointer-events: none;
   }
 }
 

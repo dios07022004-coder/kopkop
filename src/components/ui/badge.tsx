@@ -14,9 +14,9 @@ export function Badge({
       className={cn(
         "inline-flex items-center rounded-full px-3 py-1 text-xs font-medium",
         variant === "default" && "bg-primary/10 text-primary",
-        variant === "success" && "bg-emerald-100 text-emerald-800",
-        variant === "warning" && "bg-amber-100 text-amber-800",
-        variant === "danger" && "bg-red-100 text-red-800",
+        variant === "success" && "bg-[hsl(var(--success))]/15 text-[hsl(var(--success))]",
+        variant === "warning" && "bg-[hsl(var(--warning))]/15 text-[hsl(var(--warning))]",
+        variant === "danger" && "bg-[hsl(var(--danger))]/15 text-[hsl(var(--danger))]",
         variant === "secondary" && "bg-secondary text-secondary-foreground",
         className,
       )}

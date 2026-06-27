@@ -8,21 +8,21 @@ import type {
 import { cn } from "@/lib/utils";
 
 const MOOD_STYLES = {
-  calm: "border-emerald-200/80 bg-emerald-50/30",
-  caution: "border-amber-200/80 bg-amber-50/30",
-  danger: "border-red-200/80 bg-red-50/30",
+  calm: "surface-success",
+  caution: "surface-warning",
+  danger: "surface-danger",
 } as const;
 
 const MOOD_BADGE = {
-  calm: "bg-emerald-100 text-emerald-800",
-  caution: "bg-amber-100 text-amber-900",
-  danger: "bg-red-100 text-red-800",
+  calm: "bg-[hsl(var(--success))]/15 text-[hsl(var(--success))]",
+  caution: "bg-[hsl(var(--warning))]/15 text-[hsl(var(--warning))]",
+  danger: "bg-[hsl(var(--danger))]/15 text-[hsl(var(--danger))]",
 } as const;
 
 const TONE_TEXT = {
-  success: "text-emerald-700",
-  warning: "text-amber-800",
-  danger: "text-red-700",
+  success: "text-[hsl(var(--success))]",
+  warning: "text-[hsl(var(--warning))]",
+  danger: "text-[hsl(var(--danger))]",
   muted: "text-muted-foreground",
 } as const;
 
@@ -42,7 +42,7 @@ function LimitCard({
   large?: boolean;
 }) {
   return (
-    <article className="rounded-xl border border-border/60 bg-white/80 p-4">
+    <article className="rounded-xl border border-border/60 bg-card/60 p-4">
       <p className="text-xs font-medium text-muted-foreground">{title}</p>
       <p
         className={cn(
@@ -104,7 +104,7 @@ function AccumulationCard({
         {info.fundingSource}
       </p>
       {info.lifeImpact && (
-        <p className="mt-2 text-sm text-amber-900">
+        <p className="mt-2 text-sm text-[hsl(var(--warning))]">
           <span className="font-medium">{CALCULATOR_MAIN.lifeImpact}: </span>
           {info.lifeImpact}
         </p>
@@ -124,7 +124,7 @@ export function PlanViewPanel({ view }: PlanViewPanelProps) {
       aria-live="polite"
     >
       {view.warnings.length > 0 && (
-        <ul className="space-y-1.5 rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2.5 text-sm text-amber-900">
+        <ul className="surface-warning space-y-1.5 rounded-lg border px-3 py-2.5 text-sm">
           {view.warnings.map((w) => (
             <li key={w}>• {w}</li>
           ))}
@@ -171,7 +171,7 @@ export function PlanViewPanel({ view }: PlanViewPanelProps) {
       )}
 
       {view.purchase.active ? (
-        <div className="rounded-xl border border-border/60 bg-white/80 p-4">
+        <div className="rounded-xl border border-border/60 bg-card/60 p-4">
           <p className="text-xs font-medium text-muted-foreground">
             {CALCULATOR_MAIN.purchaseTitle}
           </p>
@@ -205,7 +205,7 @@ export function PlanViewPanel({ view }: PlanViewPanelProps) {
         </p>
       )}
 
-      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/60 bg-white/80 px-4 py-3">
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/60 bg-card/60 px-4 py-3">
         <span className="text-sm text-muted-foreground">{CALCULATOR_MAIN.budgetTitle}</span>
         <span
           className={cn(
@@ -235,7 +235,7 @@ export function PlanViewPanel({ view }: PlanViewPanelProps) {
         </div>
       )}
 
-      <div className="rounded-xl border border-border/60 bg-white/80 px-4 py-3 text-center text-xs">
+      <div className="rounded-xl border border-border/60 bg-card/60 px-4 py-3 text-center text-xs">
         <p className="font-medium text-foreground">
           {CALCULATOR_MAIN.confidenceTitle}: {view.confidence.label}
         </p>
@@ -248,7 +248,7 @@ export function PlanViewPanel({ view }: PlanViewPanelProps) {
       </div>
 
       {view.goal.active && !view.goal.accumulation && (
-        <div className="rounded-xl border border-border/60 bg-white/80 p-4">
+        <div className="rounded-xl border border-border/60 bg-card/60 p-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="font-semibold">Цель «{view.goal.name}»</p>
             <span className={cn("text-sm font-medium", TONE_TEXT[view.goal.tone])}>

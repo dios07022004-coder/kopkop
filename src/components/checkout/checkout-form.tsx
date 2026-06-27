@@ -62,7 +62,7 @@ export function CheckoutForm({ authed }: { authed: boolean }) {
         ) : (
           <>
             {error && (
-              <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</div>
+              <div className="surface-danger rounded-lg border p-3 text-sm">{error}</div>
             )}
             <Button className="w-full" size="lg" disabled={loading} onClick={pay}>
               {loading ? (
