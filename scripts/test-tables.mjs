@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+try { const ws = await import("ws"); if (!globalThis.WebSocket) globalThis.WebSocket = ws.default || ws.WebSocket; } catch {}
 import { createClient } from "@supabase/supabase-js";
 
 const env = {};

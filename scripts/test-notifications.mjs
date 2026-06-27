@@ -2,6 +2,8 @@
 //   node scripts/test-notifications.mjs dios07022004@gmail.com
 import fs from "node:fs";
 import path from "node:path";
+// Node 20 без нативного WebSocket → полифилл из ws (для @supabase/supabase-js)
+try { const ws = await import("ws"); if (!globalThis.WebSocket) globalThis.WebSocket = ws.default || ws.WebSocket; } catch {}
 import { createClient } from "@supabase/supabase-js";
 
 const email = (process.argv[2] || "dios07022004@gmail.com").toLowerCase();
