@@ -374,6 +374,7 @@ type Payload = {
     categories?: { id?: string; label?: string; percent?: number }[];
   };
   savingsGoal?: { goalName?: string; targetAmount?: number; currentSaved?: number };
+  purchase?: { price?: number };
 };
 
 async function latestPayload(userId: string): Promise<Payload | null> {
@@ -852,6 +853,8 @@ export type MonthSummary = {
   base: number;
   /** распределение доступного по категориям (на что можно тратить) */
   categories: { label: string; amount: number; percent: number }[];
+  /** планируемая крупная покупка из расчёта (если задана) */
+  purchase: { price: number; gap: number; months: number | null } | null;
 };
 
 export type LedgerEntry = {
@@ -875,6 +878,7 @@ type AccountBudget = {
   minBalance: number;
   payday: number;
   categories: BudgetCategory[];
+  purchasePrice: number;
 };
 
 /** Категории трат из payload (или дефолтные). */
@@ -899,9 +903,10 @@ async function accountBudget(userId: string): Promise<AccountBudget> {
     .select("*")
     .eq("user_id", userId)
     .maybeSingle();
-  // категории берём всегда из последнего расчёта (telegram_users их не хранит)
+  // категории и покупку берём всегда из последнего расчёта (telegram_users их не хранит)
   const p = await latestPayload(userId);
   const categories = categoriesFromPayload(p);
+  const purchasePrice = Math.round(p?.purchase?.price ?? 0);
 
   if (data && (data as TgUser).income > 0) {
     const u = { ...EMPTY((data as TgUser).tg_id), ...(data as Partial<TgUser>) };
@@ -917,6 +922,7 @@ async function accountBudget(userId: string): Promise<AccountBudget> {
       minBalance: u.min_balance,
       payday: u.payday,
       categories,
+      purchasePrice,
     };
   }
   // нет привязки/бюджета в боте — берём из последнего сохранённого расчёта
@@ -934,6 +940,7 @@ async function accountBudget(userId: string): Promise<AccountBudget> {
     minBalance: Math.round(b?.minimumBalance ?? 0),
     payday: Math.round(b?.payday ?? 0),
     categories,
+    purchasePrice,
   };
 }
 
@@ -953,6 +960,17 @@ export async function getMonthSummaryByUser(userId: string): Promise<MonthSummar
     amount: a.amount,
     percent: a.percent,
   }));
+  // планируемая покупка: недостача от наличных + срок по реальной сумме откладывания
+  const cashNow = Math.max(0, b.currentBalance - b.minBalance);
+  const purchaseGap = Math.max(0, b.purchasePrice - cashNow);
+  const purchase =
+    b.purchasePrice > 0
+      ? {
+          price: b.purchasePrice,
+          gap: purchaseGap,
+          months: purchaseGap > 0 && b.savings > 0 ? Math.ceil(purchaseGap / b.savings) : null,
+        }
+      : null;
   return {
     hasBudget: b.income > 0,
     linked: b.tgId != null,
@@ -970,6 +988,7 @@ export async function getMonthSummaryByUser(userId: string): Promise<MonthSummar
     nextPayday: period.nextPayday,
     base,
     categories,
+    purchase,
   };
 }
 

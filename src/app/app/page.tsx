@@ -24,7 +24,7 @@ export default async function AppPage() {
         {paid && (
           <div className="flex shrink-0 gap-2">
             <Button variant="outline" size="sm" asChild>
-              <Link href="/account">Файлы</Link>
+              <Link href="/account">Кабинет</Link>
             </Button>
             <Button variant="ghost" size="sm" asChild>
               <a href="/auth/signout">Выйти</a>

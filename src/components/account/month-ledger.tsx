@@ -25,6 +25,7 @@ type Summary = {
   nextPayday: string | null;
   base: number;
   categories: { label: string; amount: number; percent: number }[];
+  purchase: { price: number; gap: number; months: number | null } | null;
 };
 
 const fmtDate = (ymd: string) => `${ymd.slice(8, 10)}.${ymd.slice(5, 7)}`;
@@ -267,6 +268,22 @@ export function MonthLedger({ initial }: { initial?: Summary }) {
               <p className="mt-3 text-center text-xs text-muted-foreground">
                 🎯 До цели «{s.goalName}» осталось накопить <b>{fmt(s.goalRemaining)}</b>
               </p>
+            )}
+
+            {s.purchase && s.purchase.price > 0 && (
+              <div className="mt-3 rounded-xl border border-border/60 bg-muted/30 p-3 text-center text-sm">
+                🛒 Покупка <b>{fmt(s.purchase.price)}</b>
+                {s.purchase.gap <= 0 ? (
+                  <span className="text-[hsl(var(--success))]"> — хватает на счёте ✅</span>
+                ) : s.purchase.months ? (
+                  <span className="text-muted-foreground">
+                    {" "}
+                    — не хватает {fmt(s.purchase.gap)}, накопите за {s.purchase.months} мес.
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground"> — не хватает {fmt(s.purchase.gap)}</span>
+                )}
+              </div>
             )}
 
             {/* Подключите напоминания */}

@@ -54,7 +54,7 @@ export function Header() {
             {authed ? (
               <>
                 <Button variant="ghost" size="sm" className="hidden sm:inline-flex" asChild>
-                  <Link href="/app">Кабинет</Link>
+                  <Link href="/account">Кабинет</Link>
                 </Button>
                 <Button variant="outline" size="sm" className="rounded-xl px-4" asChild>
                   <a href="/auth/signout">Выйти</a>
