@@ -116,6 +116,7 @@ export function CalculatorQuiz({
   const progress = Math.round((stepNo / TOTAL) * 100);
 
   // якорь и производные для подсказок результата
+  const free = result.core.remainingAfterMandatory; // доход − обязательные
   const afterSavings = result.core.freeBudgetMonthly; // доход − обязательные − откладываю
   const price = purchase.price;
   // Покупка считается честно: можно ли купить с наличных (счёт − подушка),
@@ -239,12 +240,25 @@ export function CalculatorQuiz({
 
           {/* Накопления */}
           {budget.savingsMonthly > 0 && (
-            <div className="surface-success flex items-start gap-3 rounded-xl border p-4 text-sm">
+            <div
+              className={cn(
+                "flex items-start gap-3 rounded-xl border p-4 text-sm",
+                afterSavings < 0 ? "surface-warning" : "surface-success",
+              )}
+            >
               <PiggyBank className="mt-0.5 h-5 w-5 shrink-0" />
-              <p>
-                Откладываете <b>{formatRub(budget.savingsMonthly)}/мес</b>. На жизнь после этого остаётся{" "}
-                <b>{formatRub(Math.max(0, afterSavings))}/мес</b>.
-              </p>
+              {afterSavings < 0 ? (
+                <p>
+                  Вы откладываете <b>{formatRub(budget.savingsMonthly)}/мес</b>, но свободно только{" "}
+                  <b>{formatRub(free)}</b> — на жизнь не хватит. Уменьшите сумму откладывания примерно до{" "}
+                  <b>{formatRub(Math.max(0, Math.round(free * 0.2)))}/мес</b>.
+                </p>
+              ) : (
+                <p>
+                  Откладываете <b>{formatRub(budget.savingsMonthly)}/мес</b>. На жизнь после этого остаётся{" "}
+                  <b>{formatRub(afterSavings)}/мес</b>.
+                </p>
+              )}
             </div>
           )}
 
