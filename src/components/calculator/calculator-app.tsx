@@ -37,6 +37,7 @@ import { useCalcHistory } from "@/hooks/use-calc-history";
 import { downloadPlanXlsx } from "@/lib/export-xlsx";
 import { PlanInputs } from "@/components/calculator/plan-inputs";
 import { PlanPresets } from "@/components/calculator/plan-presets";
+import { CalculatorQuiz } from "@/components/calculator/calculator-quiz";
 import { GoalSectionContent } from "@/components/calculator/goal-section";
 import { PurchaseTab } from "@/components/calculator/purchase-tab";
 import { VerifyCalculationPanel } from "@/components/calculator/verify-calculation-panel";
@@ -82,6 +83,7 @@ export function CalculatorApp({ paid = false }: { paid?: boolean }) {
   const [tab, setTab] = useState<TabKey>("split");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [quizDone, setQuizDone] = useState(false);
 
   const handleSave = async () => {
     setSaveState("saving");
@@ -148,6 +150,22 @@ export function CalculatorApp({ paid = false }: { paid?: boolean }) {
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
+      {!quizDone ? (
+        /* Калькулятор-квиз: пошаговый ввод, в конце — результат + переход в кабинет */
+        <CalculatorQuiz
+          budget={budget}
+          onBudgetChange={(next) => setBudget(parseBudgetInput(next))}
+          result={fullResult}
+          onDone={() => setQuizDone(true)}
+        />
+      ) : (
+        <>
+      <div className="flex justify-end">
+        <Button type="button" variant="ghost" size="sm" onClick={() => setQuizDone(false)}>
+          ↺ Пройти заново
+        </Button>
+      </div>
+
       {/* 1. Ввод */}
       <PlanInputs
         budget={budget}
@@ -379,6 +397,8 @@ export function CalculatorApp({ paid = false }: { paid?: boolean }) {
             </p>
           </div>
         </LockedFeature>
+      )}
+        </>
       )}
     </div>
   );
