@@ -215,10 +215,8 @@ export const SIMPLE_EXPLANATION = {
 
 export const NAV_LINKS = [
   { href: "/app", label: "Калькулятор" },
-  { href: "/#how", label: "Как работает" },
-  { href: "/#tools", label: "Инструменты" },
-  { href: "/#inside", label: "Что внутри" },
-  { href: "/#pricing", label: "Цена" },
+  { href: "/account", label: "Кабинет" },
+  { href: "/checkout", label: "Цена" },
   { href: "/faq", label: "FAQ" },
 ] as const;
 
