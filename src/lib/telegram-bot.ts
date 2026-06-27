@@ -1,4 +1,5 @@
-import { computeFinance, cycleBounds, hasPayday } from "@/lib/finance";
+import { computeFinance, cycleBounds, hasPayday, allocateCategories, DEFAULT_CATEGORIES } from "@/lib/finance";
+import type { BudgetCategory } from "@/lib/finance";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { tgSend, tgAnswerCallback, parsePurchase } from "@/lib/telegram";
 import { userHasPaidOrder } from "@/lib/orders";
@@ -356,6 +357,7 @@ type Payload = {
     currentBalance?: number;
     minimumBalance?: number;
     payday?: number;
+    categories?: { id?: string; label?: string; percent?: number }[];
   };
   savingsGoal?: { goalName?: string; targetAmount?: number; currentSaved?: number };
 };
@@ -834,6 +836,8 @@ export type MonthSummary = {
   nextPayday: string | null;
   /** база периода: в цикле — доступно до зарплаты (счёт − подушка), иначе — free */
   base: number;
+  /** распределение доступного по категориям (на что можно тратить) */
+  categories: { label: string; amount: number; percent: number }[];
 };
 
 export type LedgerEntry = {
@@ -856,7 +860,22 @@ type AccountBudget = {
   currentBalance: number;
   minBalance: number;
   payday: number;
+  categories: BudgetCategory[];
 };
+
+/** Категории трат из payload (или дефолтные). */
+function categoriesFromPayload(p: Payload | null): BudgetCategory[] {
+  const raw = p?.budget?.categories;
+  if (!raw?.length) return DEFAULT_CATEGORIES;
+  const cats = raw
+    .filter((c) => c && (c.label || c.id) && Number(c.percent) > 0)
+    .map((c, i) => ({
+      id: c.id || `cat-${i}`,
+      label: c.label || "Категория",
+      percent: Math.max(0, Number(c.percent) || 0),
+    }));
+  return cats.length ? cats : DEFAULT_CATEGORIES;
+}
 
 /** Бюджет/цель аккаунта: из telegram_users (если привязан) или из последнего расчёта. */
 async function accountBudget(userId: string): Promise<AccountBudget> {
@@ -866,6 +885,10 @@ async function accountBudget(userId: string): Promise<AccountBudget> {
     .select("*")
     .eq("user_id", userId)
     .maybeSingle();
+  // категории берём всегда из последнего расчёта (telegram_users их не хранит)
+  const p = await latestPayload(userId);
+  const categories = categoriesFromPayload(p);
+
   if (data && (data as TgUser).income > 0) {
     const u = { ...EMPTY((data as TgUser).tg_id), ...(data as Partial<TgUser>) };
     return {
@@ -879,10 +902,10 @@ async function accountBudget(userId: string): Promise<AccountBudget> {
       currentBalance: u.current_balance,
       minBalance: u.min_balance,
       payday: u.payday,
+      categories,
     };
   }
   // нет привязки/бюджета в боте — берём из последнего сохранённого расчёта
-  const p = await latestPayload(userId);
   const b = p?.budget;
   const g = p?.savingsGoal;
   return {
@@ -896,6 +919,7 @@ async function accountBudget(userId: string): Promise<AccountBudget> {
     currentBalance: Math.round(b?.currentBalance ?? 0),
     minBalance: Math.round(b?.minimumBalance ?? 0),
     payday: Math.round(b?.payday ?? 0),
+    categories,
   };
 }
 
@@ -908,6 +932,13 @@ export async function getMonthSummaryByUser(userId: string): Promise<MonthSummar
   const spentToday = await dayExpense({ userId }, mskToday());
   const base = period.cycleMode ? Math.max(0, b.currentBalance - b.minBalance) : free;
   const remaining = base - expense + income;
+  // распределение доступного по категориям (на что можно тратить)
+  const alloc = allocateCategories(Math.max(0, base), b.categories);
+  const categories = alloc.allocations.map((a) => ({
+    label: a.label,
+    amount: a.amount,
+    percent: a.percent,
+  }));
   return {
     hasBudget: b.income > 0,
     linked: b.tgId != null,
@@ -924,6 +955,7 @@ export async function getMonthSummaryByUser(userId: string): Promise<MonthSummar
     cycleMode: period.cycleMode,
     nextPayday: period.nextPayday,
     base,
+    categories,
   };
 }
 

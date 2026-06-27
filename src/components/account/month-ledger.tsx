@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { Plus, Minus, Trash2, TrendingUp, TrendingDown } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { AnalyticsRing } from "@/components/account/analytics-ring";
 import { cn } from "@/lib/utils";
 
 type Summary = {
@@ -23,6 +24,7 @@ type Summary = {
   cycleMode: boolean;
   nextPayday: string | null;
   base: number;
+  categories: { label: string; amount: number; percent: number }[];
 };
 
 const fmtDate = (ymd: string) => `${ymd.slice(8, 10)}.${ymd.slice(5, 7)}`;
@@ -37,53 +39,6 @@ type Entry = {
 };
 
 const fmt = (n: number) => `${Math.round(n).toLocaleString("ru-RU")} ₽`;
-const dayWord = (n: number) =>
-  n % 10 === 1 && n % 100 !== 11
-    ? "день"
-    : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14)
-      ? "дня"
-      : "дней";
-
-/** Кольцевой индикатор остатка (SVG, без зависимостей). */
-function Ring({
-  remaining,
-  base,
-  over,
-  children,
-}: {
-  remaining: number;
-  base: number;
-  over: boolean;
-  children: ReactNode;
-}) {
-  const size = 156;
-  const sw = 13;
-  const r = (size - sw) / 2;
-  const c = 2 * Math.PI * r;
-  const frac = base > 0 ? Math.max(0, Math.min(1, remaining / base)) : over ? 1 : 0;
-  const color = over || frac < 0.15 ? "hsl(var(--danger))" : frac < 0.4 ? "#f59e0b" : "hsl(var(--success))";
-  const dash = (over ? 1 : frac) * c;
-  return (
-    <div className="relative" style={{ width: size, height: size }}>
-      <svg width={size} height={size} className="-rotate-90">
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="hsl(var(--muted))" strokeWidth={sw} />
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={r}
-          fill="none"
-          stroke={color}
-          strokeWidth={sw}
-          strokeLinecap="round"
-          strokeDasharray={`${dash} ${c}`}
-          style={{ transition: "stroke-dasharray 0.6s ease, stroke 0.3s ease" }}
-        />
-      </svg>
-      <div className="absolute inset-0 flex flex-col items-center justify-center text-center">{children}</div>
-    </div>
-  );
-}
-
 function Stat({ label, value, tone }: { label: string; value: string; tone?: "success" | "danger" }) {
   return (
     <div className="rounded-xl border border-border/50 bg-background/70 px-2 py-2.5 text-center">
@@ -274,31 +229,18 @@ export function MonthLedger({ initial }: { initial?: Summary }) {
         )}
 
         {s && (
-          <div className="rounded-2xl border border-border/60 bg-gradient-to-b from-primary/[0.06] to-transparent p-5">
-            {/* Кольцо-индикатор: сколько ещё можно тратить */}
-            <div className="flex flex-col items-center">
-              <Ring remaining={s.remaining} base={s.base} over={over}>
-                <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                  {over ? "Перерасход" : "Осталось"}
-                </span>
-                <span
-                  className={cn(
-                    "mt-0.5 text-2xl font-extrabold tabular-nums",
-                    over && "text-[hsl(var(--danger))]",
-                  )}
-                >
-                  {over ? `−${fmt(-s.remaining)}` : fmt(s.remaining)}
-                </span>
-                <span className="mt-0.5 text-xs text-muted-foreground">
-                  ≈ {fmt(s.perDay)}/день
-                </span>
-              </Ring>
-              <p className="mt-1 text-center text-xs text-muted-foreground">
-                {cycle && s.nextPayday
-                  ? `До зарплаты ${fmtDate(s.nextPayday)} · ${s.daysLeft} ${dayWord(s.daysLeft)}`
-                  : `Осталось ${s.daysLeft} ${dayWord(s.daysLeft)} до конца месяца`}
-              </p>
-            </div>
+          <div className="cabinet-glow rounded-2xl border border-border/60 bg-gradient-to-b from-primary/[0.07] to-transparent p-5">
+            {/* Аналитический круг: категории + центр день/месяц */}
+            <AnalyticsRing
+              remaining={s.remaining}
+              perDay={s.perDay}
+              base={s.base}
+              over={over}
+              daysLeft={s.daysLeft}
+              cycleMode={cycle}
+              nextPayday={s.nextPayday}
+              categories={s.categories}
+            />
 
             {/* Сегодня: можно потратить / уже потрачено */}
             <div className="mt-4 grid grid-cols-2 gap-2">
