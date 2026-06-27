@@ -821,6 +821,7 @@ export type MonthSummary = {
   income: number; // месячный доход
   free: number; // свободно на месяц (доход − обязательные − откладываю)
   spentMonth: number; // Σ трат за период
+  spentToday: number; // Σ трат за сегодня
   extraIncome: number; // Σ разовых доходов за период
   remaining: number; // base − spent + extraIncome
   perDay: number;
@@ -904,6 +905,7 @@ export async function getMonthSummaryByUser(userId: string): Promise<MonthSummar
   const free = freeFromBudget(b.income, b.mandatory, b.savings);
   const period = periodOf(b.payday);
   const { expense, income } = await ledgerTotals({ userId }, period.fromDay);
+  const spentToday = await dayExpense({ userId }, mskToday());
   const base = period.cycleMode ? Math.max(0, b.currentBalance - b.minBalance) : free;
   const remaining = base - expense + income;
   return {
@@ -912,6 +914,7 @@ export async function getMonthSummaryByUser(userId: string): Promise<MonthSummar
     income: b.income,
     free,
     spentMonth: expense,
+    spentToday,
     extraIncome: income,
     remaining,
     perDay: remaining > 0 ? Math.round(remaining / period.daysLeft) : 0,
@@ -1003,6 +1006,17 @@ export async function addAdjustment(
         : `Осталось ${horizon}: <b>${fmt(summary.remaining)}</b> ≈ ${fmt(summary.perDay)}/день.`;
     await tgSend(b.tgId, `${head}\n${tail}`, { keyboard: KB.keyboard });
   }
+
+  // Сразу шлём push на телефон: сколько ещё можно потратить
+  const horizon = summary.cycleMode ? "до зарплаты" : "на месяц";
+  const pushBody =
+    summary.remaining < 0
+      ? `Перерасход ${fmt(-summary.remaining)}. Сегодня лучше не тратить.`
+      : `Записал ${kind === "income" ? "доход +" : "трату "}${fmt(Math.abs(amount))}. Осталось ${horizon}: ${fmt(summary.remaining)} ≈ ${fmt(summary.perDay)}/день.`;
+  await sendPushToUser(userId, { title: "Деньги под контролем", body: pushBody, url: "/account", tag: "ledger" }).catch(
+    () => {},
+  );
+
   return summary;
 }
 

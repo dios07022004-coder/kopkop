@@ -13,6 +13,7 @@ type Summary = {
   income: number;
   free: number;
   spentMonth: number;
+  spentToday: number;
   extraIncome: number;
   remaining: number;
   perDay: number;
@@ -297,6 +298,20 @@ export function MonthLedger({ initial }: { initial?: Summary }) {
                   ? `До зарплаты ${fmtDate(s.nextPayday)} · ${s.daysLeft} ${dayWord(s.daysLeft)}`
                   : `Осталось ${s.daysLeft} ${dayWord(s.daysLeft)} до конца месяца`}
               </p>
+            </div>
+
+            {/* Сегодня: можно потратить / уже потрачено */}
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <div className="rounded-xl border border-[hsl(var(--success))]/30 bg-[hsl(var(--success))]/[0.07] p-3 text-center">
+                <p className="text-[11px] text-muted-foreground">Можно сегодня</p>
+                <p className="mt-0.5 text-lg font-bold text-[hsl(var(--success))] tabular-nums">
+                  {fmt(s.perDay)}
+                </p>
+              </div>
+              <div className="rounded-xl border border-border/60 bg-muted/40 p-3 text-center">
+                <p className="text-[11px] text-muted-foreground">Потрачено сегодня</p>
+                <p className="mt-0.5 text-lg font-bold tabular-nums">{fmt(s.spentToday)}</p>
+              </div>
             </div>
 
             {/* Чипы со сводкой */}
