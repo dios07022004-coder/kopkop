@@ -110,7 +110,7 @@ export function CalculatorQuiz({
   };
   const isPurchase = step === PURCHASE_STEP;
   const isResult = step === RESULT_STEP;
-  const isInput = step < PURCHASE_STEP;
+  const isInput = step < GOAL_STEP;
 
   const setField = (key: FieldKey, value: number) => onBudgetChange({ ...budget, [key]: value });
   const setPayday = (v: number) =>
