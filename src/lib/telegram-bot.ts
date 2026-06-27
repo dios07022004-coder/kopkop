@@ -44,10 +44,24 @@ function mskMonthStart(): string {
   const d = mskNow();
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-01`;
 }
+function mskDaysInMonth(): number {
+  const d = mskNow();
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
+}
 function mskDaysLeftInMonth(): number {
   const d = mskNow();
-  const total = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0)).getUTCDate();
-  return total - d.getUTCDate() + 1; // включая сегодня
+  return mskDaysInMonth() - d.getUTCDate() + 1; // включая сегодня
+}
+
+/**
+ * Дневная норма «сколько можно тратить в день».
+ * - Цикл (задан день зарплаты): фикс. наличные должны дожить до ЗП → остаток / дней до ЗП.
+ * - Календарный месяц: устойчивая дневная норма = свободно / дней в месяце
+ *   (не «остаток / оставшиеся дни», иначе под конец месяца цифра неадекватно растёт).
+ */
+function dailyAllowance(cycleMode: boolean, free: number, remaining: number, daysLeft: number): number {
+  if (cycleMode) return remaining > 0 ? Math.round(remaining / Math.max(1, daysLeft)) : 0;
+  return free > 0 ? Math.round(free / mskDaysInMonth()) : 0;
 }
 function mskHour(): number {
   return mskNow().getUTCHours();
@@ -256,7 +270,7 @@ async function computeStatus(u: TgUser) {
   // база периода: в режиме цикла — деньги, доступные до зарплаты (счёт − подушка)
   const base = period.cycleMode ? Math.max(0, u.current_balance - u.min_balance) : free;
   const remaining = base - expense + income;
-  const perDay = remaining > 0 ? Math.round(remaining / period.daysLeft) : 0;
+  const perDay = dailyAllowance(period.cycleMode, free, remaining, period.daysLeft);
   return { period, expense, income, free, base, remaining, perDay };
 }
 
@@ -948,7 +962,7 @@ export async function getMonthSummaryByUser(userId: string): Promise<MonthSummar
     spentToday,
     extraIncome: income,
     remaining,
-    perDay: remaining > 0 ? Math.round(remaining / period.daysLeft) : 0,
+    perDay: dailyAllowance(period.cycleMode, free, remaining, period.daysLeft),
     daysLeft: period.daysLeft,
     goalName: b.goalName,
     goalRemaining: Math.max(0, b.goalTarget - b.goalSaved),
