@@ -5,6 +5,7 @@ import { PwaRegister } from "@/components/pwa-register";
 import { InstallBanner } from "@/components/install-banner";
 import { UtmCapture } from "@/components/utm-capture";
 import { Header, Footer } from "@/components/layout/header-footer";
+import { BottomNav } from "@/components/layout/bottom-nav";
 import { DEFAULT_METADATA } from "@/lib/seo/metadata";
 import "./globals.css";
 
@@ -31,8 +32,9 @@ export default function RootLayout({
     <html lang="ru">
       <body className={`${inter.variable} font-sans antialiased`}>
         <Header />
-        <main className="min-h-[calc(100vh-8rem)]">{children}</main>
+        <main className="min-h-[calc(100vh-8rem)] pb-16 md:pb-0">{children}</main>
         <Footer />
+        <BottomNav />
         <AnalyticsScripts />
         <PwaRegister />
         <InstallBanner />
