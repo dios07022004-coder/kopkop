@@ -77,5 +77,7 @@ export function normalizePurchaseInput(raw: Partial<PurchaseInput>): PurchaseInp
     price: toNonNegativeNumber(raw.price),
     urgency: toScore(raw.urgency),
     usefulness: toScore(raw.usefulness),
+    monthlyContribution:
+      raw.monthlyContribution !== undefined ? toNonNegativeNumber(raw.monthlyContribution) : undefined,
   };
 }

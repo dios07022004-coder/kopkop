@@ -67,6 +67,8 @@ export interface PurchaseInput {
   price: number;
   urgency: number;
   usefulness: number;
+  /** Сколько откладывать в месяц на эту покупку (взнос). */
+  monthlyContribution?: number;
 }
 
 export interface PurchaseDecision {

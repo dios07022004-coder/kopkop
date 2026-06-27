@@ -374,7 +374,7 @@ type Payload = {
     categories?: { id?: string; label?: string; percent?: number }[];
   };
   savingsGoal?: { goalName?: string; targetAmount?: number; currentSaved?: number };
-  purchase?: { price?: number };
+  purchase?: { price?: number; monthlyContribution?: number };
 };
 
 /** Явно выбранный активный шаблон аккаунта (или null). */
@@ -901,6 +901,7 @@ type AccountBudget = {
   payday: number;
   categories: BudgetCategory[];
   purchasePrice: number;
+  purchaseMonthly: number;
 };
 
 /** Категории трат из payload (или дефолтные). */
@@ -929,6 +930,7 @@ async function accountBudget(userId: string): Promise<AccountBudget> {
   const p = await latestPayload(userId);
   const categories = categoriesFromPayload(p);
   const purchasePrice = Math.round(p?.purchase?.price ?? 0);
+  const purchaseMonthly = Math.round(p?.purchase?.monthlyContribution ?? 0);
 
   if (data && (data as TgUser).income > 0) {
     const u = { ...EMPTY((data as TgUser).tg_id), ...(data as Partial<TgUser>) };
@@ -945,6 +947,7 @@ async function accountBudget(userId: string): Promise<AccountBudget> {
       payday: u.payday,
       categories,
       purchasePrice,
+      purchaseMonthly,
     };
   }
   // нет привязки/бюджета в боте — берём из последнего сохранённого расчёта
@@ -963,6 +966,7 @@ async function accountBudget(userId: string): Promise<AccountBudget> {
     payday: Math.round(b?.payday ?? 0),
     categories,
     purchasePrice,
+    purchaseMonthly,
   };
 }
 
@@ -985,12 +989,14 @@ export async function getMonthSummaryByUser(userId: string): Promise<MonthSummar
   // планируемая покупка: недостача от наличных + срок по реальной сумме откладывания
   const cashNow = Math.max(0, b.currentBalance - b.minBalance);
   const purchaseGap = Math.max(0, b.purchasePrice - cashNow);
+  // срок до покупки — по взносу на покупку (или общему откладыванию, для старых расчётов)
+  const purchaseRate = b.purchaseMonthly > 0 ? b.purchaseMonthly : b.savings;
   const purchase =
     b.purchasePrice > 0
       ? {
           price: b.purchasePrice,
           gap: purchaseGap,
-          months: purchaseGap > 0 && b.savings > 0 ? Math.ceil(purchaseGap / b.savings) : null,
+          months: purchaseGap > 0 && purchaseRate > 0 ? Math.ceil(purchaseGap / purchaseRate) : null,
         }
       : null;
   return {
